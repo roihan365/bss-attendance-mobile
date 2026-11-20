@@ -1,6 +1,6 @@
-import 'package:bss_attendance_new/domain/entities/attendance_record.dart';
+import 'attendance_record.dart';
 
-class TodayAttendance {
+class TodayStatus {
   final bool checkedIn;
   final bool checkedOut;
   final bool canCheckIn;
@@ -8,7 +8,7 @@ class TodayAttendance {
   final AttendanceRecord? checkIn;
   final AttendanceRecord? checkOut;
 
-  const TodayAttendance({
+  const TodayStatus({
     required this.checkedIn,
     required this.checkedOut,
     required this.canCheckIn,
@@ -16,4 +16,15 @@ class TodayAttendance {
     this.checkIn,
     this.checkOut,
   });
+
+  factory TodayStatus.empty() {
+    return const TodayStatus(
+      checkedIn: false,
+      checkedOut: false,
+      canCheckIn: true,
+      canCheckOut: false,
+      checkIn: null,
+      checkOut: null,
+    );
+  }
 }

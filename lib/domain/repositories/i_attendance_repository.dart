@@ -1,28 +1,37 @@
 import '../entities/attendance_record.dart';
+import '../entities/today_status.dart';
+import '../entities/sync_batch_result.dart';
 
-abstract class IAttendanceRepository {
-  Future<List<AttendanceRecord>> getAllRecords();
-  Future<void> saveRecord(AttendanceRecord record);
-  Future<AttendanceRecord?> getCurrentCheckIn();
-  Future<bool> isCheckedIn();
-  Future<void> clearAll();
-
-  // Additional methods for use cases
-  Future<AttendanceRecord> checkIn(String userId);
-  Future<AttendanceRecord> checkOut(String userId);
-  Future<LocationData> getCurrentLocation();
-  Future<void> syncAllPending();
-}
-
-// Data class for location (used in repository)
 class LocationData {
   final String latitude;
   final String longitude;
   final String locationName;
 
-  LocationData({
+  const LocationData({
     required this.latitude,
     required this.longitude,
     required this.locationName,
   });
+}
+
+abstract class IAttendanceRepository {
+  Future<TodayStatus> getTodayStatus();
+  Future<AttendanceRecord> checkIn(String userId);
+  Future<AttendanceRecord> checkOut(String userId);
+  Future<List<AttendanceRecord>> getAttendanceHistory({
+    DateTime? startDate,
+    DateTime? endDate,
+    int? month,
+    int? year,
+    String? type,
+    int? page,
+    int? perPage,
+  });
+  Future<List<AttendanceRecord>> getAllRecords();
+  Future<SyncBatchResult> syncBatchOffline();
+  Future<LocationData> getCurrentLocation();
+  Future<AttendanceRecord?> getCurrentCheckIn();
+  Future<bool> isCheckedIn();
+  Future<void> saveRecord(AttendanceRecord record);
+  Future<void> clearAll();
 }
