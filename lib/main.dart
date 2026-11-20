@@ -84,8 +84,34 @@ class AttendanceHomePage extends StatefulWidget {
   AttendanceHomePageState createState() => AttendanceHomePageState();
 }
 
-class AttendanceHomePageState extends State<AttendanceHomePage> {
+class AttendanceHomePageState extends State<AttendanceHomePage>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Otomatis refresh status absensi hari ini (GET /attendance/today) & GPS saat app dibuka dari background
+      if (mounted) {
+        final attendanceProvider =
+            Provider.of<AttendanceProvider>(context, listen: false);
+        attendanceProvider.refreshAll();
+        attendanceProvider.refreshLocation();
+      }
+    }
+  }
 
   void setSelectedIndex(int index) {
     setState(() {
