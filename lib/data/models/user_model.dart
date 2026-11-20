@@ -16,7 +16,7 @@ class UserModel extends User {
     //   "user": { "id": 1, "name": "...", "email": "...", "email_verified_at": "..." }
     // }
     if (json.containsKey('user') && json['user'] is Map) {
-      final userData = json['user'] as Map<String, dynamic>;
+      final userData = Map<String, dynamic>.from(json['user'] as Map);
       return UserModel(
         id: userData['id']?.toString() ?? '',
         email: userData['email']?.toString() ?? '',

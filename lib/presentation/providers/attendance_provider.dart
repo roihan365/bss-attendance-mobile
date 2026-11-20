@@ -22,7 +22,7 @@ class AttendanceProvider extends ChangeNotifier {
   final GetCurrentLocationUseCase getCurrentLocationUseCase;
   final SyncBatchOfflineUseCase syncBatchOfflineUseCase;
   final ConnectivityService connectivityService;
-  final AuthProvider? authProvider;
+  AuthProvider? authProvider;
 
   List<AttendanceRecord> _records = [];
   TodayStatus _todayStatus = TodayStatus.empty();
@@ -68,6 +68,13 @@ class AttendanceProvider extends ChangeNotifier {
   }) {
     _loadInitialData();
     _listenConnectivity();
+  }
+
+  void updateAuth(AuthProvider? newAuthProvider) {
+    authProvider = newAuthProvider;
+    if (authProvider != null && authProvider!.isLoggedIn) {
+      _loadInitialData();
+    }
   }
 
   void _listenConnectivity() {

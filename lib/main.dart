@@ -25,8 +25,13 @@ void main() async {
         ),
         ChangeNotifierProxyProvider<AuthProvider, AttendanceProvider>(
           create: (_) => getIt<AttendanceProvider>(param1: null),
-          update: (_, authProvider, _) =>
-              getIt<AttendanceProvider>(param1: authProvider),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              previous.updateAuth(authProvider);
+              return previous;
+            }
+            return getIt<AttendanceProvider>(param1: authProvider);
+          },
         ),
       ],
       child: const MyApp(),

@@ -30,14 +30,15 @@ class DioClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           AppLogger.i('DIO', '--> ${options.method} ${options.uri}');
-          if (getToken != null) {
+          final isPublicAuth = options.path.contains('/auth/login');
+          if (getToken != null && !isPublicAuth) {
             final token = await getToken!();
             if (token != null && token.isNotEmpty) {
               options.headers['Authorization'] = 'Bearer $token';
               final preview = token.length > 12 ? '${token.substring(0, 10)}...' : token;
               AppLogger.d('DIO', 'Header: Authorization Bearer $preview');
             } else {
-              AppLogger.w('DIO', 'Header: Tidak ada token autentikasi (Bearer null)');
+              AppLogger.w('DIO', 'Header: Tidak ada token autentikasi (Bearer null) untuk request terproteksi: ${options.path}');
             }
           }
           if (options.data != null) {

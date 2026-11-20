@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/security/secure_storage_service.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/i_auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
@@ -20,14 +21,21 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<User> login(String email, String password) async {
     final userModel = await remoteDataSource.login(email, password);
 
+    AppLogger.i('AUTH', '🎉 Login sukses dari server untuk user: ${userModel.name} (ID: ${userModel.id})');
+
     // 1. Simpan token secara aman di Android Keystore / iOS Keychain
-    if (userModel.token != null) {
+    if (userModel.token != null && userModel.token!.isNotEmpty) {
       await secureStorageService.saveToken(userModel.token!);
       await secureStorageService.saveUserId(userModel.id);
+      final preview = userModel.token!.length > 12 ? '${userModel.token!.substring(0, 10)}...' : userModel.token!;
+      AppLogger.i('AUTH', '🔑 Token tersimpan di KeyStore: $preview');
+    } else {
+      AppLogger.w('AUTH', '⚠️ userModel.token bernilai NULL dari response login!');
     }
 
     // 2. Simpan profil user
     await saveUser(userModel);
+    AppLogger.i('AUTH', '💾 Profil user tersimpan di local cache.');
     return userModel;
   }
 
