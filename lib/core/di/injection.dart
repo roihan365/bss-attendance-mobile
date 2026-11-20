@@ -1,11 +1,13 @@
 import 'package:get_it/get_it.dart';
+import '../../core/database/database_helper.dart';
+import '../../core/sync/sync_manager.dart';
 import '../../data/datasources/attendance_remote_data_source.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
 import '../../data/datasources/connectivity_service.dart';
 import '../../data/datasources/geolocator_location_service.dart';
 import '../../data/datasources/i_attendance_local_data_source.dart';
 import '../../data/datasources/i_location_service.dart';
-import '../../data/datasources/shared_prefs_data_source.dart';
+import '../../data/datasources/sqlite_attendance_local_data_source.dart';
 import '../../data/repositories/attendance_repository_impl.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
@@ -30,7 +32,11 @@ import '../network/dio_client.dart';
 final getIt = GetIt.instance;
 
 Future<void> initDependencies() async {
-  // 1. External & Network Client
+  // 1. External, Network Client & Database
+  getIt.registerLazySingleton<DatabaseHelper>(
+    () => DatabaseHelper(),
+  );
+
   getIt.registerLazySingleton<DioClient>(
     () => DioClient(
       getToken: () => getIt<IAuthRepository>().getToken(),
@@ -40,15 +46,15 @@ Future<void> initDependencies() async {
     ),
   );
 
-  // 2. Data Sources
+  // 2. Data Sources (SQLite Local Data Source as SSOT)
+  getIt.registerLazySingleton<IAttendanceLocalDataSource>(
+    () => SqliteAttendanceLocalDataSource(databaseHelper: getIt()),
+  );
   getIt.registerLazySingleton<IAuthRemoteDataSource>(
     () => AuthRemoteDataSource(dioClient: getIt()),
   );
   getIt.registerLazySingleton<IAttendanceRemoteDataSourceNew>(
     () => AttendanceRemoteDataSource(dioClient: getIt()),
-  );
-  getIt.registerLazySingleton<IAttendanceLocalDataSource>(
-    () => SharedPrefsDataSource(),
   );
   getIt.registerLazySingleton<ILocationService>(
     () => GeolocatorLocationService(),
@@ -88,7 +94,15 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton(() => SyncBatchOfflineUseCase(getIt()));
   getIt.registerLazySingleton(() => SyncAttendanceUseCase(getIt()));
 
-  // 6. Presentation Providers
+  // 6. Sync Manager
+  getIt.registerLazySingleton(
+    () => SyncManager(
+      connectivityService: getIt(),
+      syncBatchOfflineUseCase: getIt(),
+    ),
+  );
+
+  // 7. Presentation Providers
   getIt.registerFactory(
     () => AuthProvider(
       loginUseCase: getIt(),
