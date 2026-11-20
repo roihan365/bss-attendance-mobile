@@ -1,211 +1,210 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../components/components.dart';
 import '../providers/attendance_provider.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String _selectedFilter = 'all'; // 'all' | 'checkin' | 'checkout'
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AttendanceProvider>(context);
-    final records = provider.records;
+    final allRecords = provider.records;
+
+    // Filter data berdasarkan tipe dan query pencarian
+    final filteredRecords = allRecords.where((r) {
+      if (_selectedFilter == 'checkin' && r.type != 'checkin') return false;
+      if (_selectedFilter == 'checkout' && r.type != 'checkout') return false;
+
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchLocation = r.locationName.toLowerCase().contains(query);
+        final matchType = r.type.toLowerCase().contains(query);
+        return matchLocation || matchType;
+      }
+      return true;
+    }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Attendance History',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        backgroundColor: Colors.transparent,
+        title: Text('Riwayat Presensi', style: AppTextStyles.h2),
+        backgroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
+          AppIconButton(
+            icon: Icons.refresh_rounded,
             onPressed: () => provider.refreshAll(),
-            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Segarkan Riwayat',
+            color: AppColors.steelBlue,
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Filter & Search Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
+            ),
+            child: Column(
+              children: [
+                // Search Input
+                TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                  style: AppTextStyles.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Cari lokasi site atau catatan...',
+                    hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textSecondary),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: AppColors.background,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.borderSubtle),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.borderSubtle),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Filter Chips (Semua, Masuk, Pulang)
+                Row(
+                  children: [
+                    _buildFilterChip('Semua', 'all', allRecords.length),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'Presensi Masuk',
+                      'checkin',
+                      allRecords.where((r) => r.type == 'checkin').length,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'Presensi Pulang',
+                      'checkout',
+                      allRecords.where((r) => r.type == 'checkout').length,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // List Riwayat
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => provider.refreshAll(),
+              color: AppColors.steelBlue,
+              child: filteredRecords.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 80),
+                        child: EmptyStateView(
+                          title: 'Belum Ada Riwayat',
+                          message: _searchQuery.isNotEmpty
+                              ? 'Tidak ditemukan riwayat yang cocok dengan pencarian Anda.'
+                              : 'Presensi yang Anda lakukan di lapangan akan otomatis tercatat di sini.',
+                          icon: Icons.history_rounded,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredRecords.length,
+                      itemBuilder: (context, index) {
+                        final record = filteredRecords[index];
+                        return AttendanceHistoryCard(
+                          type: record.type,
+                          timestamp: record.timestamp,
+                          locationName: record.locationName,
+                          isSynced: record.syncStatus,
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
       ),
-      body: records.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history_rounded,
-                    size: 80,
-                    color: Colors.grey.shade300,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No attendance records yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your check-in and check-out history\nwill appear here',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
-                  ),
-                ],
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value, int count) {
+    final isSelected = _selectedFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedFilter = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.steelBlue : AppColors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.steelBlue : AppColors.borderSubtle,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: AppTextStyles.badgeText.copyWith(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: records.length,
-              itemBuilder: (context, index) {
-                final record = records[index];
-                final isCheckIn = record.type == 'checkin';
-                final color = isCheckIn
-                    ? const Color(0xFF4A6CF7)
-                    : Colors.orange.shade600;
-                final icon = isCheckIn
-                    ? Icons.login_rounded
-                    : Icons.exit_to_app_rounded;
-                final label = isCheckIn ? 'Check In' : 'Check Out';
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.shade100,
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icon, color: color, size: 24),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  label,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A2E),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    DateFormat(
-                                      'dd MMM',
-                                    ).format(record.timestamp),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 16,
-                                  color: Colors.grey.shade500,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  DateFormat(
-                                    'hh:mm a',
-                                  ).format(record.timestamp),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Icon(
-                                  Icons.location_on_rounded,
-                                  size: 16,
-                                  color: Colors.grey.shade500,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    record.locationName,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (record.type == 'checkin' &&
-                          record.id == provider.currentCheckIn?.id)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Active',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ),
-
-                      if (record.syncStatus == false)
-                        Icon(
-                          Icons.sync_problem,
-                          color: Colors.orange,
-                          size: 16,
-                        ),
-                      if (record.syncStatus == true)
-                        Icon(Icons.check_circle, color: Colors.green, size: 16),
-                    ],
-                  ),
-                );
-              },
             ),
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: AppTextStyles.badgeText.copyWith(
+                  fontSize: 10,
+                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
