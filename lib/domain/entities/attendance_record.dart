@@ -1,16 +1,17 @@
 class AttendanceRecord {
-  final String id; // ID lokal
-  final String? serverId; // ID database server
-  final String? uuid; // UUID dari server
+  final String id;
+  final String? serverId;
+  final String? uuid;
   final String userId;
-  final String type; // check_in / check_out
+  final String type; // 'checkin' | 'checkout'
   final DateTime timestamp;
   final String latitude;
   final String longitude;
   final String locationName;
-  final bool syncStatus; // true / /false
+  final bool syncStatus;
+  final String? syncError;
 
-  AttendanceRecord({
+  const AttendanceRecord({
     required this.id,
     this.serverId,
     this.uuid,
@@ -21,83 +22,34 @@ class AttendanceRecord {
     required this.longitude,
     this.locationName = 'Unknown Location',
     this.syncStatus = false,
+    this.syncError,
   });
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'serverId': serverId,
-    'uuid': uuid,
-    'userId': userId,
-    'type': type,
-    'timestamp': timestamp.toIso8601String(),
-    'latitude': latitude,
-    'longitude': longitude,
-    'locationName': locationName,
-    'syncStatus': syncStatus,
-  };
-
-  factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
+  AttendanceRecord copyWith({
+    String? id,
+    String? serverId,
+    String? uuid,
+    String? userId,
+    String? type,
+    DateTime? timestamp,
+    String? latitude,
+    String? longitude,
+    String? locationName,
+    bool? syncStatus,
+    String? syncError,
+  }) {
     return AttendanceRecord(
-      id: json['id']?.toString() ?? '',
-      serverId: json['serverId']?.toString(),
-      uuid: json['uuid']?.toString(),
-      userId: json['userId']?.toString() ?? '',
-      type: json['type']?.toString() ?? '',
-      timestamp: _parseTimestamp(json['timestamps']),
-      latitude: json['latitude'],
-      longitude: json['longitude'],
-      locationName: json['locationName']?.toString() ?? 'Unknown Location',
-      syncStatus: _parseBool(json['sync_status']),
+      id: id ?? this.id,
+      serverId: serverId ?? this.serverId,
+      uuid: uuid ?? this.uuid,
+      userId: userId ?? this.userId,
+      type: type ?? this.type,
+      timestamp: timestamp ?? this.timestamp,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      locationName: locationName ?? this.locationName,
+      syncStatus: syncStatus ?? this.syncStatus,
+      syncError: syncError ?? this.syncError,
     );
-  }
-
-  /// Request ke API Laravel
-  Map<String, dynamic> toApiJson() {
-    return {
-      'type': type == 'checkin' ? 'checkin' : 'checkout',
-      'timestamps': timestamp.toUtc().toIso8601String(),
-      'latitude': latitude,
-      'longitude': longitude,
-      'location_name': locationName,
-    };
-  }
-
-  static DateTime _parseTimestamp(dynamic value) {
-    if (value == null) {
-      throw const FormatException('Timestamp tidak tersedia');
-    }
-
-    if (value is DateTime) {
-      return value;
-    }
-
-    final valueString = value.toString().trim();
-
-    if (valueString.isEmpty) {
-      throw const FormatException('Timestamp kosong');
-    }
-
-    // API: 2026-08-13 04:07:00
-    return DateTime.parse(valueString.replaceFirst(' ', 'T'));
-  }
-
-  static bool _parseBool(dynamic value) {
-    if (value == null) {
-      return false;
-    }
-
-    if (value is bool) {
-      return value;
-    }
-
-    if (value is int) {
-      return value == 1;
-    }
-
-    if (value is String) {
-      return value == '1' || value.toLowerCase() == 'true';
-    }
-
-    return false;
   }
 }

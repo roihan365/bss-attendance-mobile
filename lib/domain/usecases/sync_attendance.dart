@@ -1,3 +1,4 @@
+import '../entities/sync_batch_result.dart';
 import '../repositories/i_attendance_repository.dart';
 
 class SyncAttendanceUseCase {
@@ -5,9 +6,7 @@ class SyncAttendanceUseCase {
 
   SyncAttendanceUseCase(this.repository);
 
-  Future<void> call() async {
-    // Asumsikan repository memiliki method syncAllPending
-    // Kita perlu tambahkan di interface IAttendanceRepository
-    await repository.syncAllPending();
+  Future<SyncBatchResult> call() async {
+    return await repository.syncBatchOffline();
   }
 }

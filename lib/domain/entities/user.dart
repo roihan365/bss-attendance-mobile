@@ -3,51 +3,29 @@ class User {
   final String email;
   final String? name;
   final String? token;
+  final DateTime? emailVerifiedAt;
 
-  User({required this.id, required this.email, this.name, this.token});
+  const User({
+    required this.id,
+    required this.email,
+    this.name,
+    this.token,
+    this.emailVerifiedAt,
+  });
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'email': email,
-    'name': name,
-    'token': token,
-  };
-
-  factory User.fromJson(Map<String, dynamic> json) {
-    final user = json['user'];
-
-    // Format dari API login:
-    // {
-    //   "token": "...",
-    //   "user": {
-    //     "id": 1,
-    //     "name": "...",
-    //     "email": "..."
-    //   }
-    // }
-
-    if (user is Map) {
-      return User(
-        id: user['id']?.toString() ?? '',
-        email: user['email']?.toString() ?? '',
-        name: user['name']?.toString() ?? user['full_name']?.toString(),
-        token: json['token']?.toString(),
-      );
-    }
-
-    // Format dari SharedPreferences:
-    // {
-    //   "id": "1",
-    //   "email": "...",
-    //   "name": "...",
-    //   "token": "..."
-    // }
-
+  User copyWith({
+    String? id,
+    String? email,
+    String? name,
+    String? token,
+    DateTime? emailVerifiedAt,
+  }) {
     return User(
-      id: json['id']?.toString() ?? '',
-      email: json['email']?.toString() ?? '',
-      name: json['name']?.toString() ?? json['full_name']?.toString(),
-      token: json['token']?.toString(),
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      token: token ?? this.token,
+      emailVerifiedAt: emailVerifiedAt ?? this.emailVerifiedAt,
     );
   }
 }

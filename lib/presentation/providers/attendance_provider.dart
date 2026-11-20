@@ -1,62 +1,66 @@
-import 'package:bss_attendance_new/data/datasources/connectivity_service.dart';
-import 'package:bss_attendance_new/domain/usecases/sync_attendance.dart';
-import 'package:bss_attendance_new/presentation/providers/auth_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import '../../data/datasources/connectivity_service.dart';
 import '../../domain/entities/attendance_record.dart';
+import '../../domain/entities/today_status.dart';
+import '../../domain/repositories/i_attendance_repository.dart';
 import '../../domain/usecases/check_in.dart';
 import '../../domain/usecases/check_out.dart';
-import '../../domain/usecases/get_today_records.dart';
-import '../../domain/usecases/get_all_records.dart';
+import '../../domain/usecases/get_attendance_history.dart';
 import '../../domain/usecases/get_current_location.dart';
-import '../../domain/repositories/i_attendance_repository.dart';
+import '../../domain/usecases/get_today_status.dart';
+import '../../domain/usecases/sync_batch_offline.dart';
+import 'auth_provider.dart';
 
 class AttendanceProvider extends ChangeNotifier {
   final CheckInUseCase checkInUseCase;
   final CheckOutUseCase checkOutUseCase;
-  final GetTodayRecordsUseCase getTodayRecordsUseCase;
-  final GetAllRecordsUseCase getAllRecordsUseCase;
+  final GetTodayStatusUseCase getTodayStatusUseCase;
+  final GetAttendanceHistoryUseCase getAttendanceHistoryUseCase;
   final GetCurrentLocationUseCase getCurrentLocationUseCase;
-  final SyncAttendanceUseCase syncAttendanceUseCase;
+  final SyncBatchOfflineUseCase syncBatchOfflineUseCase;
   final ConnectivityService connectivityService;
   final AuthProvider? authProvider;
 
   List<AttendanceRecord> _records = [];
-  bool _isCheckedIn = false;
-  AttendanceRecord? _currentCheckIn;
+  TodayStatus _todayStatus = TodayStatus.empty();
   bool _isLoading = false;
+  bool _isSyncing = false;
   LocationData? _currentLocation;
 
   List<AttendanceRecord> get records => _records;
-  bool get isCheckedIn => _isCheckedIn;
-  AttendanceRecord? get currentCheckIn => _currentCheckIn;
+  TodayStatus get todayStatus => _todayStatus;
+  bool get isCheckedIn => _todayStatus.checkedIn && !_todayStatus.checkedOut;
+  bool get isCheckedOut => _todayStatus.checkedOut;
+  bool get canCheckIn => _todayStatus.canCheckIn;
+  bool get canCheckOut => _todayStatus.canCheckOut;
+  AttendanceRecord? get currentCheckIn => _todayStatus.checkIn;
+  AttendanceRecord? get currentCheckOut => _todayStatus.checkOut;
   bool get isLoading => _isLoading;
-  String get currentLocationName =>
-      _currentLocation?.locationName ?? 'Fetching location...';
+  bool get isSyncing => _isSyncing;
+  String get currentLocationName => _currentLocation?.locationName ?? 'Mendeteksi lokasi GPS...';
   String? get currentLatitude => _currentLocation?.latitude;
   String? get currentLongitude => _currentLocation?.longitude;
 
+  int get pendingSyncCount => _records.where((r) => !r.syncStatus).length;
+
   List<AttendanceRecord> get todayRecords {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return _records
-        .where(
-          (r) =>
-              r.timestamp.year == today.year &&
-              r.timestamp.month == today.month &&
-              r.timestamp.day == today.day,
-        )
-        .toList()
+    return _records.where((r) {
+      return r.timestamp.year == now.year &&
+          r.timestamp.month == now.month &&
+          r.timestamp.day == now.day;
+    }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
   AttendanceProvider({
     required this.checkInUseCase,
     required this.checkOutUseCase,
-    required this.getTodayRecordsUseCase,
-    required this.getAllRecordsUseCase,
+    required this.getTodayStatusUseCase,
+    required this.getAttendanceHistoryUseCase,
     required this.getCurrentLocationUseCase,
-    required this.syncAttendanceUseCase,
+    required this.syncBatchOfflineUseCase,
     required this.connectivityService,
     this.authProvider,
   }) {
@@ -65,26 +69,27 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   void _listenConnectivity() {
-    connectivityService.onConnectivityChanged.listen((
-      List<ConnectivityResult> results,
-    ) {
-      // Check if any connection is active
+    connectivityService.onConnectivityChanged.listen((results) {
       final hasConnection = results.any((r) => r != ConnectivityResult.none);
-      print(hasConnection);
-      if (hasConnection) {
-        // Internet tersambung, sync pending records
+      if (hasConnection && pendingSyncCount > 0) {
         syncPending();
       }
     });
   }
 
   Future<void> syncPending() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    notifyListeners();
+
     try {
-      await syncAttendanceUseCase();
-      // Refresh data setelah sync
+      await syncBatchOfflineUseCase();
       await _loadInitialData();
-    } catch (e) {
-      // handle error
+    } catch (_) {
+      // Error handled, records remain pending
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 
@@ -93,21 +98,18 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _records = await getAllRecordsUseCase();
-      _isCheckedIn = await checkInUseCase.repository.isCheckedIn();
-      _currentCheckIn = await checkInUseCase.repository.getCurrentCheckIn();
+      _todayStatus = await getTodayStatusUseCase();
+      _records = await getAttendanceHistoryUseCase();
       _currentLocation = await getCurrentLocationUseCase();
-    } catch (e) {
-      // handle error
+    } catch (_) {
+      // Handled gracefully
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
-  Future<void> checkIn() async {
-    if (_isCheckedIn) throw Exception('Already checked in');
-
+  Future<AttendanceRecord> checkIn() async {
     if (authProvider == null || !authProvider!.isLoggedIn) {
       throw Exception('Silakan login terlebih dahulu');
     }
@@ -118,20 +120,17 @@ class AttendanceProvider extends ChangeNotifier {
     try {
       final userId = authProvider!.currentUser!.id;
       final record = await checkInUseCase(userId);
-      _isCheckedIn = true;
-      _currentCheckIn = record;
+      _todayStatus = await getTodayStatusUseCase();
+      _records = await getAttendanceHistoryUseCase();
       _currentLocation = await getCurrentLocationUseCase();
-    } catch (e) {
+      return record;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      rethrow;
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
-  Future<void> checkOut() async {
-    if (!_isCheckedIn) throw Exception('Not checked in');
+  Future<AttendanceRecord> checkOut() async {
     if (authProvider == null || !authProvider!.isLoggedIn) {
       throw Exception('Silakan login terlebih dahulu');
     }
@@ -141,17 +140,15 @@ class AttendanceProvider extends ChangeNotifier {
 
     try {
       final userId = authProvider!.currentUser!.id;
-      await checkOutUseCase(userId);
-      _isCheckedIn = false;
-      _currentCheckIn = null;
+      final record = await checkOutUseCase(userId);
+      _todayStatus = await getTodayStatusUseCase();
+      _records = await getAttendanceHistoryUseCase();
       _currentLocation = await getCurrentLocationUseCase();
-    } catch (e) {
+      return record;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      rethrow;
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> refreshLocation() async {
@@ -164,10 +161,12 @@ class AttendanceProvider extends ChangeNotifier {
   Future<void> refreshAll() async {
     _isLoading = true;
     notifyListeners();
-    _records = await getAllRecordsUseCase();
-    _isCheckedIn = await checkInUseCase.repository.isCheckedIn();
-    _currentCheckIn = await checkInUseCase.repository.getCurrentCheckIn();
-    _isLoading = false;
-    notifyListeners();
+    try {
+      _todayStatus = await getTodayStatusUseCase();
+      _records = await getAttendanceHistoryUseCase();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }
