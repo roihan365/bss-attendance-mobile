@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'core/config/app_config.dart';
+import 'core/theme/app_colors.dart';
 import 'data/datasources/shared_prefs_data_source.dart';
 import 'data/datasources/geolocator_location_service.dart';
 import 'data/datasources/attendance_api_data_source.dart';
@@ -25,8 +27,11 @@ import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/history_screen.dart';
 import 'presentation/screens/profile_screen.dart';
 
-void main() {
-  final baseUrl = 'http://attendance-be.test/api'; // Ganti dengan URL API Anda
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.initialize();
+
+  final baseUrl = AppConfig.baseUrl;
 
   // Data Sources
   final localDataSource = SharedPrefsDataSource();
@@ -88,7 +93,7 @@ void main() {
             getCurrentLocationUseCase: getCurrentLocationUseCase,
             syncAttendanceUseCase: syncAttendanceUseCase,
             connectivityService: connectivityService,
-            authProvider: null, // akan diisi oleh update
+            authProvider: null,
           ),
           update: (context, authProvider, attendanceProvider) {
             return AttendanceProvider(
@@ -117,21 +122,28 @@ class MyApp extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return MaterialApp(
-      title: 'Attendance Tracker',
+      title: 'BSS Attendance',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Poppins',
         useMaterial3: true,
-        brightness: Brightness.light,
+        scaffoldBackgroundColor: AppColors.background,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4A6CF7),
+          seedColor: AppColors.steelBlue,
+          primary: AppColors.steelBlue,
+          surface: Colors.white,
           brightness: Brightness.light,
+        ),
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          Theme.of(context).textTheme,
         ),
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
-          systemOverlayStyle: SystemUiOverlayStyle(systemNavigationBarColor: Color(0x00000000)),
+          backgroundColor: Colors.transparent,
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+          ),
         ),
       ),
       home: authProvider.isLoggedIn
@@ -145,7 +157,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// AttendanceHomePage tetap sama seperti sebelumnya
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
 
@@ -165,38 +176,48 @@ class AttendanceHomePageState extends State<AttendanceHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
           children: const [HomeScreen(), HistoryScreen(), ProfileScreen()],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF4A6CF7),
-        unselectedItemColor: Colors.grey.shade600,
-        showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: 'History',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.borderSubtle, width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          selectedItemColor: AppColors.steelBlue,
+          unselectedItemColor: AppColors.textMuted,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Beranda',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'Riwayat',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'Profil',
+            ),
+          ],
+        ),
       ),
     );
   }

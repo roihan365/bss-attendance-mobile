@@ -124,12 +124,8 @@ class AttendanceApiDataSource implements IAttendanceRemoteDataSource {
         timestamp: serverData['timestamps'] != null
             ? DateTime.parse(serverData['timestamps'].toString())
             : record.timestamp,
-        latitude: serverData['latitude'] != null
-            ? serverData['latitude']
-            : record.latitude,
-        longitude: serverData['longitude'] != null
-            ? serverData['longitude']
-            : record.longitude,
+        latitude: serverData['latitude'] ?? record.latitude,
+        longitude: serverData['longitude'] ?? record.longitude,
         locationName:
             serverData['location_name']?.toString() ?? record.locationName,
         syncStatus: true,
