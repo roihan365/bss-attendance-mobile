@@ -184,7 +184,7 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
     final result = await remoteDataSource.syncBatchOffline(pendingRecords);
 
     // Perbarui record di penyimpanan lokal berdasarkan respon server
-    final updatedRecords = [...localRecords];
+    final updatedRecords = List<AttendanceRecord>.from(localRecords);
 
     for (final saved in result.savedRecords) {
       final index = updatedRecords.indexWhere((r) => r.uuid == saved.uuid || r.id == saved.id);
@@ -246,7 +246,7 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
           merged[r.id] = r;
         }
 
-        final combined = merged.values.toList()
+        final combined = List<AttendanceRecord>.from(merged.values)
           ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
         return combined;
@@ -260,7 +260,7 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
 
   @override
   Future<List<AttendanceRecord>> getAllRecords() async {
-    final localRecords = await localDataSource.loadRecords();
+    final localRecords = List<AttendanceRecord>.from(await localDataSource.loadRecords());
     localRecords.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     _updateCheckInState(localRecords);
     return localRecords;
@@ -268,17 +268,8 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
 
   @override
   Future<void> saveRecord(AttendanceRecord record) async {
-    final records = await localDataSource.loadRecords();
-    final index = records.indexWhere((r) => r.id == record.id || (r.uuid != null && r.uuid == record.uuid));
-
-    if (index != -1) {
-      records[index] = record;
-    } else {
-      records.add(record);
-    }
-
-    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    await localDataSource.saveRecords(records);
+    await localDataSource.saveRecord(record);
+    final records = List<AttendanceRecord>.from(await localDataSource.loadRecords());
     _updateCheckInState(records);
   }
 

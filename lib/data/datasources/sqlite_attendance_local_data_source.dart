@@ -18,7 +18,7 @@ class SqliteAttendanceLocalDataSource implements IAttendanceLocalDataSource {
       orderBy: 'timestamps DESC',
     );
 
-    return maps.map((map) {
+    return maps.map<AttendanceRecord>((map) {
       return AttendanceModel(
         id: map['uuid']?.toString() ?? '',
         serverId: map['server_id']?.toString(),
@@ -51,6 +51,7 @@ class SqliteAttendanceLocalDataSource implements IAttendanceLocalDataSource {
     });
   }
 
+  @override
   Future<void> saveRecord(AttendanceRecord record) async {
     final db = await databaseHelper.database;
     await db.insert(
@@ -69,7 +70,7 @@ class SqliteAttendanceLocalDataSource implements IAttendanceLocalDataSource {
       orderBy: 'timestamps ASC',
     );
 
-    return maps.map((map) {
+    return maps.map<AttendanceRecord>((map) {
       return AttendanceModel(
         id: map['uuid']?.toString() ?? '',
         serverId: map['server_id']?.toString(),

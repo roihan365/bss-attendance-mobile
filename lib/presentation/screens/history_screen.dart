@@ -103,23 +103,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 const SizedBox(height: 10),
 
-                // Filter Chips (Semua, Masuk, Pulang)
-                Row(
-                  children: [
-                    _buildFilterChip('Semua', 'all', allRecords.length),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Presensi Masuk',
-                      'checkin',
-                      allRecords.where((r) => r.type == 'checkin').length,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Presensi Pulang',
-                      'checkout',
-                      allRecords.where((r) => r.type == 'checkout').length,
-                    ),
-                  ],
+                // Filter Chips (Semua, Masuk, Pulang) - Horizontally scrollable
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildFilterChip('Semua', 'all', allRecords.length),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Presensi Masuk',
+                        'checkin',
+                        allRecords.where((r) => r.type == 'checkin').length,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Presensi Pulang',
+                        'checkout',
+                        allRecords.where((r) => r.type == 'checkout').length,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
