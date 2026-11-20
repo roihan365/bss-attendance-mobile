@@ -186,9 +186,6 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
        * Local masih bisa digunakan sebagai fallback.
        */
       throw Exception(e);
-      // print('Get attendance history gagal: $e');
-
-      return _cachedRecords!;
     }
   }
 

@@ -1,30 +1,82 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:bss_attendance_new/main.dart';
+import 'package:bss_attendance_new/presentation/components/components.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('UI Components Smoke Tests', () {
+    testWidgets('AppButton renders text and triggers callback', (tester) async {
+      bool tapped = false;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(
+              text: 'Presensi Masuk',
+              onPressed: () => tapped = true,
+            ),
+          ),
+        ),
+      );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(find.text('Presensi Masuk'), findsOneWidget);
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pump();
+      expect(tapped, isTrue);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    testWidgets('AppButton displays loading indicator when isLoading is true', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(
+              text: 'Simpan',
+              isLoading: true,
+              onPressed: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Simpan'), findsNothing);
+    });
+
+    testWidgets('LocationInfoCard renders site information', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LocationInfoCard(
+              locationName: 'Site Proyek BSS - Sektor Utara',
+              latitude: '-6.2145',
+              longitude: '106.8451',
+              isRefreshing: false,
+              onRefreshLocation: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Site Proyek BSS - Sektor Utara'), findsOneWidget);
+      expect(find.text('GPS Aktif'), findsOneWidget);
+      expect(find.text('Koordinat: -6.2145, 106.8451'), findsOneWidget);
+    });
+
+    testWidgets('OfflineStatusBanner renders proper offline message', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: OfflineStatusBanner(
+              isOffline: true,
+              pendingCount: 3,
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.text('Mode Offline: 3 presensi tersimpan di perangkat'),
+        findsOneWidget,
+      );
+    });
   });
 }

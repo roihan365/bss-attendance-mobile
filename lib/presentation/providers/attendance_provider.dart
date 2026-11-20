@@ -141,7 +141,7 @@ class AttendanceProvider extends ChangeNotifier {
 
     try {
       final userId = authProvider!.currentUser!.id;
-      final record = await checkOutUseCase(userId);
+      await checkOutUseCase(userId);
       _isCheckedIn = false;
       _currentCheckIn = null;
       _currentLocation = await getCurrentLocationUseCase();
