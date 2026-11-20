@@ -50,9 +50,7 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton<DioClient>(
     () => DioClient(
       getToken: () => getIt<IAuthRepository>().getToken(),
-      onUnauthorized: () {
-        getIt<IAuthRepository>().clearUser();
-      },
+      onUnauthorized: null, // Token tidak dihapus secara otomatis agar tidak hilang saat terjadi glitch jaringan/server
     ),
   );
 

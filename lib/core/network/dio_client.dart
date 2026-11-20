@@ -60,8 +60,7 @@ class DioClient {
           );
 
           if (statusCode == 401) {
-            AppLogger.w('DIO', 'Sesi login telah berakhir atau token tidak valid (401 Unauthorized)');
-            onUnauthorized?.call();
+            AppLogger.w('DIO', 'Server mengembalikan 401 Unauthorized. Token tetap dipertahankan di storage perangkat.');
             return handler.reject(
               DioException(
                 requestOptions: error.requestOptions,
