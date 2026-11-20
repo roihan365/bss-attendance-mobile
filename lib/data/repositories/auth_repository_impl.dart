@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/security/secure_storage_service.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/i_auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
@@ -7,13 +8,25 @@ import '../models/user_model.dart';
 
 class AuthRepositoryImpl implements IAuthRepository {
   final IAuthRemoteDataSource remoteDataSource;
+  final SecureStorageService secureStorageService;
   static const String _userKey = 'user_data';
 
-  AuthRepositoryImpl({required this.remoteDataSource});
+  AuthRepositoryImpl({
+    required this.remoteDataSource,
+    required this.secureStorageService,
+  });
 
   @override
   Future<User> login(String email, String password) async {
     final userModel = await remoteDataSource.login(email, password);
+
+    // 1. Simpan token secara aman di Android Keystore / iOS Keychain
+    if (userModel.token != null) {
+      await secureStorageService.saveToken(userModel.token!);
+      await secureStorageService.saveUserId(userModel.id);
+    }
+
+    // 2. Simpan profil user
     await saveUser(userModel);
     return userModel;
   }
@@ -22,9 +35,7 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<void> logout() async {
     try {
       await remoteDataSource.logout();
-    } catch (_) {
-      // Abaikan jika token di server gagal di-delete (misal offline), tetap bersihkan lokal
-    }
+    } catch (_) {}
     await clearUser();
   }
 
@@ -32,13 +43,17 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<User?> getCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString(_userKey);
+    final secureToken = await secureStorageService.getToken();
+
     if (data == null || data.isEmpty) {
       return null;
     }
 
     try {
       final jsonData = jsonDecode(data) as Map<String, dynamic>;
-      return UserModel.fromJson(jsonData);
+      final user = UserModel.fromJson(jsonData);
+      // Selalu gunakan token terenkripsi dari Keystore/Keychain
+      return user.copyWith(token: secureToken ?? user.token);
     } catch (_) {
       return null;
     }
@@ -48,9 +63,8 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<User?> refreshUserProfile() async {
     try {
       final userProfile = await remoteDataSource.getUserProfile();
-      final currentUser = await getCurrentUser();
-      // Pertahankan token yang sudah tersimpan
-      final updatedUser = userProfile.copyWith(token: currentUser?.token);
+      final secureToken = await secureStorageService.getToken();
+      final updatedUser = userProfile.copyWith(token: secureToken);
       await saveUser(updatedUser);
       return updatedUser;
     } catch (_) {
@@ -60,14 +74,13 @@ class AuthRepositoryImpl implements IAuthRepository {
 
   @override
   Future<bool> isLoggedIn() async {
-    final user = await getCurrentUser();
-    return user != null && user.token != null && user.token!.isNotEmpty;
+    final token = await secureStorageService.getToken();
+    return token != null && token.isNotEmpty;
   }
 
   @override
   Future<String?> getToken() async {
-    final user = await getCurrentUser();
-    return user?.token;
+    return await secureStorageService.getToken();
   }
 
   @override
@@ -87,5 +100,6 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<void> clearUser() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
+    await secureStorageService.clearAll();
   }
 }
