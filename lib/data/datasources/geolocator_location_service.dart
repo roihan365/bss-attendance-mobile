@@ -1,5 +1,6 @@
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../core/security/anti_mock_location_service.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
 import 'i_location_service.dart';
 
@@ -9,7 +10,7 @@ class GeolocatorLocationService implements ILocationService {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
     if (!serviceEnabled) {
-      throw Exception('Location services are disabled.');
+      throw Exception('Layanan GPS / Lokasi pada perangkat nonaktif. Mohon aktifkan GPS.');
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
@@ -19,18 +20,25 @@ class GeolocatorLocationService implements ILocationService {
     }
 
     if (permission == LocationPermission.denied) {
-      throw Exception('Location permission denied');
+      throw Exception('Izin akses lokasi ditolak oleh pengguna.');
     }
 
     if (permission == LocationPermission.deniedForever) {
-      throw Exception('Location permission permanently denied');
+      throw Exception('Izin akses lokasi ditolak permanen. Buka Pengaturan untuk mengaktifkan.');
     }
 
+    // Ambil koordinat GPS dengan akurasi tinggi
     final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
     );
 
-    String locationName = 'Current Location';
+    // SECURITY CHECK: Validasi Anti-Mock Location (Fake GPS)
+    AntiMockLocationService.validatePosition(position);
+
+    String locationName = 'Lokasi Terdeteksi';
 
     try {
       final placemarks = await placemarkFromCoordinates(
@@ -46,17 +54,16 @@ class GeolocatorLocationService implements ILocationService {
           place.subLocality,
           place.locality,
           place.administrativeArea,
-          place.country,
         ].where((e) => e != null && e.trim().isNotEmpty);
 
         locationName = parts.join(', ');
 
         if (locationName.isEmpty) {
-          locationName = 'Current Location';
+          locationName = 'Koordinat: ${position.latitude}, ${position.longitude}';
         }
       }
-    } catch (e) {
-      print('Geocoding error: $e');
+    } catch (_) {
+      locationName = 'Koordinat: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
     }
 
     return LocationData(

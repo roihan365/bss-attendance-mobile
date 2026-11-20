@@ -1,5 +1,7 @@
 import 'package:get_it/get_it.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/security/biometric_auth_service.dart';
+import '../../core/security/secure_storage_service.dart';
 import '../../core/sync/sync_manager.dart';
 import '../../data/datasources/attendance_remote_data_source.dart';
 import '../../data/datasources/auth_remote_data_source.dart';
@@ -37,6 +39,14 @@ Future<void> initDependencies() async {
     () => DatabaseHelper(),
   );
 
+  getIt.registerLazySingleton<SecureStorageService>(
+    () => SecureStorageService(),
+  );
+
+  getIt.registerLazySingleton<BiometricAuthService>(
+    () => BiometricAuthService(),
+  );
+
   getIt.registerLazySingleton<DioClient>(
     () => DioClient(
       getToken: () => getIt<IAuthRepository>().getToken(),
@@ -65,7 +75,10 @@ Future<void> initDependencies() async {
 
   // 3. Repositories
   getIt.registerLazySingleton<IAuthRepository>(
-    () => AuthRepositoryImpl(remoteDataSource: getIt()),
+    () => AuthRepositoryImpl(
+      remoteDataSource: getIt(),
+      secureStorageService: getIt(),
+    ),
   );
   getIt.registerLazySingleton<IAttendanceRepository>(
     () => AttendanceRepositoryImpl(

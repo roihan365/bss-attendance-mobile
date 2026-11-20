@@ -88,13 +88,17 @@ class SqliteAttendanceLocalDataSource implements IAttendanceLocalDataSource {
 
   Future<void> markAsSynced(String uuid, {String? serverId}) async {
     final db = await databaseHelper.database;
+    final updateData = <String, dynamic>{
+      'sync_status': 1,
+      'sync_error': null,
+    };
+    if (serverId != null) {
+      updateData['server_id'] = serverId;
+    }
+
     await db.update(
       DatabaseHelper.tableAttendances,
-      {
-        'sync_status': 1,
-        'sync_error': null,
-        if (serverId != null) 'server_id': serverId,
-      },
+      updateData,
       where: 'uuid = ?',
       whereArgs: [uuid],
     );
