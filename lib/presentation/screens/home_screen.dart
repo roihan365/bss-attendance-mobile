@@ -27,6 +27,19 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final record = await provider.checkIn();
       if (context.mounted) {
+        if (record.syncStatus) {
+          _showFeedbackSnackBar(
+            context,
+            'Presensi Masuk berhasil dikirim ke server (Online)',
+            AppColors.emeraldGreen,
+          );
+        } else {
+          _showFeedbackSnackBar(
+            context,
+            '⏳ Presensi Masuk disimpan offline (Menunggu sinyal / tersimpan di antrean)',
+            AppColors.safetyAmber,
+          );
+        }
         AttendanceResultSheet.show(
           context,
           type: record.type,
@@ -46,6 +59,19 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final record = await provider.checkOut();
       if (context.mounted) {
+        if (record.syncStatus) {
+          _showFeedbackSnackBar(
+            context,
+            'Presensi Pulang berhasil dikirim ke server (Online)',
+            AppColors.emeraldGreen,
+          );
+        } else {
+          _showFeedbackSnackBar(
+            context,
+            '⏳ Presensi Pulang disimpan offline (Menunggu sinyal / tersimpan di antrean)',
+            AppColors.safetyAmber,
+          );
+        }
         AttendanceResultSheet.show(
           context,
           type: record.type,
@@ -59,6 +85,49 @@ class _HomeScreenState extends State<HomeScreen> {
         _showErrorSnackBar(context, e.toString());
       }
     }
+  }
+
+  Future<void> _handleManualSync(BuildContext context, AttendanceProvider provider) async {
+    try {
+      final result = await provider.syncPending();
+      if (context.mounted && result != null) {
+        if (result.totalSaved > 0) {
+          _showFeedbackSnackBar(
+            context,
+            'Berhasil sinkronisasi: ${result.totalSaved} presensi tersimpan di server.',
+            AppColors.emeraldGreen,
+          );
+        } else if (result.totalSkipped > 0) {
+          _showFeedbackSnackBar(
+            context,
+            '${result.totalSkipped} data dilewati server (sudah ada di database).',
+            AppColors.steelBlue,
+          );
+        } else {
+          _showFeedbackSnackBar(
+            context,
+            'Semua antrean offline sudah sinkron.',
+            AppColors.steelBlue,
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showErrorSnackBar(context, 'Gagal sinkronisasi antrean: ${e.toString()}');
+      }
+    }
+  }
+
+  void _showFeedbackSnackBar(BuildContext context, String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {
@@ -96,6 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
               isOffline: false,
               pendingCount: attendanceProvider.pendingSyncCount,
               isSyncing: attendanceProvider.isSyncing,
+              onSyncPressed: () => _handleManualSync(context, attendanceProvider),
             ),
 
             Expanded(

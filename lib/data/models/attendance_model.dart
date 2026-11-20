@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+import '../../core/utils/uuid_helper.dart';
 import '../../domain/entities/attendance_record.dart';
 
 class AttendanceModel extends AttendanceRecord {
@@ -85,22 +87,29 @@ class AttendanceModel extends AttendanceRecord {
 
   /// Format pengiriman ke endpoint real-time /attendance/save
   Map<String, dynamic> toApiSaveJson() {
-    return {
-      'uuid': uuid ?? id,
+    final payload = <String, dynamic>{
       'type': type == 'checkout' ? 'checkout' : 'checkin',
-      'timestamps': timestamp.toUtc().toIso8601String(),
+      'timestamps': DateFormat('yyyy-MM-dd HH:mm:ss').format(timestamp),
       'latitude': double.tryParse(latitude) ?? 0.0,
       'longitude': double.tryParse(longitude) ?? 0.0,
       'location_name': locationName,
     };
+    final recordUuid = uuid ?? id;
+    if (recordUuid.isNotEmpty && UuidHelper.isValid(recordUuid)) {
+      payload['uuid'] = recordUuid;
+    }
+    return payload;
   }
 
   /// Format pengiriman ke endpoint batch /attendance/sync-offline
   Map<String, dynamic> toApiSyncJson() {
+    final recordUuid = (uuid != null && uuid!.isNotEmpty && UuidHelper.isValid(uuid!))
+        ? uuid!
+        : (UuidHelper.isValid(id) ? id : UuidHelper.generate());
     return {
-      'uuid': uuid ?? id,
+      'uuid': recordUuid,
       'type': type == 'checkout' ? 'checkout' : 'checkin',
-      'timestamps': timestamp.toUtc().toIso8601String(),
+      'timestamps': DateFormat('yyyy-MM-dd HH:mm:ss').format(timestamp),
       'latitude': double.tryParse(latitude) ?? 0.0,
       'longitude': double.tryParse(longitude) ?? 0.0,
       'location_name': locationName,

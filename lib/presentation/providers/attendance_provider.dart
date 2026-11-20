@@ -1,7 +1,9 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import '../../core/utils/app_logger.dart';
 import '../../data/datasources/connectivity_service.dart';
 import '../../domain/entities/attendance_record.dart';
+import '../../domain/entities/sync_batch_result.dart';
 import '../../domain/entities/today_status.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
 import '../../domain/usecases/check_in.dart';
@@ -77,16 +79,20 @@ class AttendanceProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> syncPending() async {
-    if (_isSyncing) return;
+  Future<SyncBatchResult?> syncPending() async {
+    if (_isSyncing) return null;
     _isSyncing = true;
     notifyListeners();
 
     try {
-      await syncBatchOfflineUseCase();
+      AppLogger.i('PROVIDER', '🔄 Tombol kirim antrean ditekan. Memulai sinkronisasi offline...');
+      final result = await syncBatchOfflineUseCase();
       await _loadInitialData();
-    } catch (_) {
-      // Error handled, records remain pending
+      AppLogger.i('PROVIDER', 'Sinkronisasi selesai: ${result.totalSaved} tersimpan, ${result.totalSkipped} dilewati.');
+      return result;
+    } catch (e, stack) {
+      AppLogger.e('PROVIDER', '❌ Gagal sinkronisasi antrean: $e', e, stack);
+      rethrow;
     } finally {
       _isSyncing = false;
       notifyListeners();

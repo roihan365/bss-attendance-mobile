@@ -1,3 +1,4 @@
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/uuid_helper.dart';
 import '../../domain/entities/attendance_record.dart';
 import '../../domain/entities/sync_batch_result.dart';
@@ -106,17 +107,26 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
 
     // 1. Simpan selalu ke penyimpanan lokal terlebih dahulu (Offline-First)
     await saveRecord(record);
+    AppLogger.i('ATTENDANCE', '💾 Presensi Masuk disimpan ke SQLite lokal (UUID: $recordUuid, Lat: ${location.latitude}, Long: ${location.longitude})');
 
     // 2. Jika online, langsung kirim ke server secara real-time
     final hasInternet = await connectivityService.hasInternet();
+    AppLogger.i('ATTENDANCE', '📡 Memeriksa status koneksi internet: hasInternet=$hasInternet');
+
     if (hasInternet) {
       try {
+        AppLogger.i('ATTENDANCE', '🚀 Mengirim absensi masuk ke server real-time (POST /attendance/save)...');
         final synced = await remoteDataSource.sendAttendance(record);
+        AppLogger.i('ATTENDANCE', 'SUKSES terkirim ke server! Server ID: ${synced.serverId}, syncStatus: ${synced.syncStatus}');
         await saveRecord(synced);
         return synced;
-      } catch (_) {
-        // Tetap kembalikan record lokal yang berstatus pending
+      } catch (e, stack) {
+        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, record tetap tersimpan di SQLite sebagai antrean pending: $e', e, stack);
+        final failedRecord = record.copyWith(syncError: e.toString());
+        await saveRecord(failedRecord);
       }
+    } else {
+      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi masuk disimpan sebagai antrean offline.');
     }
 
     return record;
@@ -145,16 +155,25 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
     );
 
     await saveRecord(record);
+    AppLogger.i('ATTENDANCE', '💾 Presensi Pulang disimpan ke SQLite lokal (UUID: $recordUuid)');
 
     final hasInternet = await connectivityService.hasInternet();
+    AppLogger.i('ATTENDANCE', '📡 Memeriksa status koneksi internet: hasInternet=$hasInternet');
+
     if (hasInternet) {
       try {
+        AppLogger.i('ATTENDANCE', '🚀 Mengirim absensi pulang ke server real-time (POST /attendance/save)...');
         final synced = await remoteDataSource.sendAttendance(record);
+        AppLogger.i('ATTENDANCE', 'SUKSES terkirim ke server! Server ID: ${synced.serverId}, syncStatus: ${synced.syncStatus}');
         await saveRecord(synced);
         return synced;
-      } catch (_) {
-        // Tetap simpan lokal
+      } catch (e, stack) {
+        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, record tetap tersimpan di SQLite sebagai antrean pending: $e', e, stack);
+        final failedRecord = record.copyWith(syncError: e.toString());
+        await saveRecord(failedRecord);
       }
+    } else {
+      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi pulang disimpan sebagai antrean offline.');
     }
 
     return record;
@@ -165,7 +184,10 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
     final localRecords = await localDataSource.loadRecords();
     final pendingRecords = localRecords.where((r) => !r.syncStatus).toList();
 
+    AppLogger.i('SYNC', '🔄 Memulai proses sinkronisasi antrean offline...');
+
     if (pendingRecords.isEmpty) {
+      AppLogger.i('SYNC', 'Tidak ada antrean offline yang perlu dikirim (pending count: 0).');
       return const SyncBatchResult(
         totalReceived: 0,
         totalSaved: 0,
@@ -175,39 +197,49 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
       );
     }
 
+    AppLogger.i('SYNC', '📦 Ditemukan ${pendingRecords.length} data antrean offline yang belum tersinkron.');
+
     final hasInternet = await connectivityService.hasInternet();
     if (!hasInternet) {
+      AppLogger.w('SYNC', '⚠️ Tidak dapat menyinkronkan: Perangkat sedang offline.');
       throw Exception('Perangkat sedang offline. Sinkronisasi akan berjalan saat online.');
     }
 
-    // Panggil BATCH SYNC endpoint POST /attendance/sync-offline
-    final result = await remoteDataSource.syncBatchOffline(pendingRecords);
+    try {
+      AppLogger.i('SYNC', '🚀 Mengirim ${pendingRecords.length} data ke endpoint batch POST /attendance/sync-offline...');
+      final result = await remoteDataSource.syncBatchOffline(pendingRecords);
+      AppLogger.i('SYNC', 'Respon sync batch diterima: Total diterima=${result.totalReceived}, Berhasil disimpan=${result.totalSaved}, Dilewati=${result.totalSkipped}');
 
-    // Perbarui record di penyimpanan lokal berdasarkan respon server
-    final updatedRecords = List<AttendanceRecord>.from(localRecords);
+      // Perbarui record di penyimpanan lokal berdasarkan respon server
+      final updatedRecords = List<AttendanceRecord>.from(localRecords);
 
-    for (final saved in result.savedRecords) {
-      final index = updatedRecords.indexWhere((r) => r.uuid == saved.uuid || r.id == saved.id);
-      if (index != -1) {
-        updatedRecords[index] = saved.copyWith(syncStatus: true);
+      for (final saved in result.savedRecords) {
+        AppLogger.i('SYNC', '  -> Data tersimpan di server: UUID=${saved.uuid}, ID=${saved.serverId}');
+        final index = updatedRecords.indexWhere((r) => r.uuid == saved.uuid || r.id == saved.id);
+        if (index != -1) {
+          updatedRecords[index] = saved.copyWith(syncStatus: true, syncError: null);
+        }
       }
-    }
 
-    for (final skipped in result.skippedRecords) {
-      final index = updatedRecords.indexWhere((r) => r.uuid == skipped.uuid);
-      if (index != -1) {
-        // Tandai sebagai tersinkronkan agar tidak dikirim berulang kali dan simpan pesan alasannya
-        updatedRecords[index] = updatedRecords[index].copyWith(
-          syncStatus: true,
-          syncError: skipped.reason,
-        );
+      for (final skipped in result.skippedRecords) {
+        AppLogger.w('SYNC', '  -> Data dilewati oleh server: UUID=${skipped.uuid}, Alasan: ${skipped.reason}');
+        final index = updatedRecords.indexWhere((r) => r.uuid == skipped.uuid);
+        if (index != -1) {
+          updatedRecords[index] = updatedRecords[index].copyWith(
+            syncStatus: true,
+            syncError: skipped.reason,
+          );
+        }
       }
+
+      await localDataSource.saveRecords(updatedRecords);
+      _updateCheckInState(updatedRecords);
+
+      return result;
+    } catch (e, stack) {
+      AppLogger.e('SYNC', '❌ Sinkronisasi batch gagal dieksekusi: $e', e, stack);
+      rethrow;
     }
-
-    await localDataSource.saveRecords(updatedRecords);
-    _updateCheckInState(updatedRecords);
-
-    return result;
   }
 
   @override

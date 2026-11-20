@@ -74,13 +74,31 @@ class AuthRepositoryImpl implements IAuthRepository {
 
   @override
   Future<bool> isLoggedIn() async {
-    final token = await secureStorageService.getToken();
+    final token = await getToken();
     return token != null && token.isNotEmpty;
   }
 
   @override
   Future<String?> getToken() async {
-    return await secureStorageService.getToken();
+    final secureToken = await secureStorageService.getToken();
+    if (secureToken != null && secureToken.isNotEmpty) {
+      return secureToken;
+    }
+    // Fallback ke SharedPreferences jika Keystore/Keychain kosong
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString(_userKey);
+      if (data != null && data.isNotEmpty) {
+        final jsonData = jsonDecode(data) as Map<String, dynamic>;
+        final token = jsonData['token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          // Pulihkan ke secure storage
+          await secureStorageService.saveToken(token);
+          return token;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../config/app_config.dart';
+import '../utils/app_logger.dart';
 import 'api_exceptions.dart';
 
 class DioClient {
@@ -28,21 +29,37 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          AppLogger.i('DIO', '--> ${options.method} ${options.uri}');
           if (getToken != null) {
             final token = await getToken!();
             if (token != null && token.isNotEmpty) {
               options.headers['Authorization'] = 'Bearer $token';
+              final preview = token.length > 12 ? '${token.substring(0, 10)}...' : token;
+              AppLogger.d('DIO', 'Header: Authorization Bearer $preview');
+            } else {
+              AppLogger.w('DIO', 'Header: Tidak ada token autentikasi (Bearer null)');
             }
+          }
+          if (options.data != null) {
+            AppLogger.d('DIO', 'Request Payload: ${options.data}');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
+          AppLogger.i('DIO', '<-- [${response.statusCode}] ${response.requestOptions.method} ${response.requestOptions.uri}');
+          AppLogger.d('DIO', 'Response Body: ${response.data}');
           return handler.next(response);
         },
         onError: (DioException error, handler) {
           final statusCode = error.response?.statusCode;
+          AppLogger.e(
+            'DIO',
+            '<-- ERROR [${statusCode ?? 'NO_STATUS'}] ${error.requestOptions.method} ${error.requestOptions.uri}: ${error.message}',
+            error.response?.data ?? error.error,
+          );
 
           if (statusCode == 401) {
+            AppLogger.w('DIO', 'Sesi login telah berakhir atau token tidak valid (401 Unauthorized)');
             onUnauthorized?.call();
             return handler.reject(
               DioException(
@@ -56,6 +73,7 @@ class DioClient {
           if (error.type == DioExceptionType.connectionTimeout ||
               error.type == DioExceptionType.receiveTimeout ||
               error.type == DioExceptionType.connectionError) {
+            AppLogger.w('DIO', 'Koneksi jaringan gagal / batas waktu terlampaui (${error.type})');
             return handler.reject(
               DioException(
                 requestOptions: error.requestOptions,

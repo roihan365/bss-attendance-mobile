@@ -6,12 +6,14 @@ class OfflineStatusBanner extends StatelessWidget {
   final bool isOffline;
   final int pendingCount;
   final bool isSyncing;
+  final VoidCallback? onSyncPressed;
 
   const OfflineStatusBanner({
     super.key,
     required this.isOffline,
     required this.pendingCount,
     this.isSyncing = false,
+    this.onSyncPressed,
   });
 
   @override
@@ -66,6 +68,28 @@ class OfflineStatusBanner extends StatelessWidget {
               ),
             ),
           ),
+          if (onSyncPressed != null && pendingCount > 0 && !isSyncing) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: onSyncPressed,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: textColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Kirim Sekarang',
+                  style: AppTextStyles.badgeText.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -41,6 +41,36 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _handleSync(BuildContext context, AttendanceProvider provider) async {
+    try {
+      final result = await provider.syncPending();
+      if (context.mounted && result != null) {
+        final message = result.totalSaved > 0
+            ? 'Berhasil menyinkronkan ${result.totalSaved} presensi ke server.'
+            : (result.totalSkipped > 0
+                ? ' ${result.totalSkipped} data dilewati server (duplikat).'
+                : ' Tidak ada antrean baru yang tersimpan.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: result.totalSaved > 0 ? AppColors.emeraldGreen : AppColors.steelBlue,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Gagal sinkronisasi: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: AppColors.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -210,7 +240,7 @@ class ProfileScreen extends StatelessWidget {
                       width: 80,
                       height: 36,
                       isLoading: attendanceProvider.isSyncing,
-                      onPressed: () => attendanceProvider.syncPending(),
+                      onPressed: () => _handleSync(context, attendanceProvider),
                       variant: AppButtonVariant.primary,
                     ),
                   ],
