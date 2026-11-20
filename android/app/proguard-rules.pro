@@ -1,3 +1,7 @@
+# Google Play Core & Deferred Components (Suppress warnings for optional dynamic split components)
+-dontwarn com.google.android.play.core.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
+
 # Flutter Wrapper Rules
 -keep class io.flutter.app.** { *; }
 -keep class io.flutter.plugin.**  { *; }
