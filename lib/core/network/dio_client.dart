@@ -35,6 +35,7 @@ class DioClient {
             final token = await getToken!();
             if (token != null && token.isNotEmpty) {
               options.headers['Authorization'] = 'Bearer $token';
+              options.headers['X-Authorization'] = 'Bearer $token';
               final preview = token.length > 12 ? '${token.substring(0, 10)}...' : token;
               AppLogger.d('DIO', 'Header: Authorization Bearer $preview');
             } else {

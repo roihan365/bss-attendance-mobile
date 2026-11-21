@@ -70,6 +70,8 @@ class GeolocatorLocationService implements ILocationService {
       latitude: position.latitude.toString(),
       longitude: position.longitude.toString(),
       locationName: locationName,
+      accuracy: position.accuracy,
+      isMocked: position.isMocked,
     );
   }
 }

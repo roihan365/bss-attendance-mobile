@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../domain/entities/attendance_record.dart';
 import '../components/components.dart';
 import '../providers/attendance_provider.dart';
+
+enum DateFilterPreset { all, today, last7Days, thisMonth, custom }
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -13,7 +17,9 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _selectedFilter = 'all'; // 'all' | 'checkin' | 'checkout'
+  String _selectedTypeFilter = 'all'; // 'all' | 'checkin' | 'checkout'
+  DateFilterPreset _selectedDatePreset = DateFilterPreset.all;
+  DateTimeRange? _customDateRange;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -23,24 +29,119 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final initialDateRange = _customDateRange ??
+        DateTimeRange(
+          start: now.subtract(const Duration(days: 7)),
+          end: now,
+        );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now.add(const Duration(days: 1)),
+      initialDateRange: initialDateRange,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.steelBlue,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDatePreset = DateFilterPreset.custom;
+        _customDateRange = picked;
+      });
+    }
+  }
+
+  bool _matchesDateFilter(DateTime date) {
+    final now = DateTime.now();
+    final target = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (_selectedDatePreset) {
+      case DateFilterPreset.all:
+        return true;
+      case DateFilterPreset.today:
+        return target.isAtSameMomentAs(today);
+      case DateFilterPreset.last7Days:
+        final sevenDaysAgo = today.subtract(const Duration(days: 6));
+        return !target.isBefore(sevenDaysAgo) && !target.isAfter(today);
+      case DateFilterPreset.thisMonth:
+        return date.year == now.year && date.month == now.month;
+      case DateFilterPreset.custom:
+        if (_customDateRange == null) return true;
+        final start = DateTime(
+          _customDateRange!.start.year,
+          _customDateRange!.start.month,
+          _customDateRange!.start.day,
+        );
+        final end = DateTime(
+          _customDateRange!.end.year,
+          _customDateRange!.end.month,
+          _customDateRange!.end.day,
+          23,
+          59,
+          59,
+        );
+        return !date.isBefore(start) && !date.isAfter(end);
+    }
+  }
+
+  Map<String, List<AttendanceRecord>> _groupRecordsByDay(List<AttendanceRecord> records) {
+    final Map<String, List<AttendanceRecord>> groups = {};
+
+    for (final record in records) {
+      final key = DateFormat('yyyy-MM-dd').format(record.timestamp);
+      if (!groups.containsKey(key)) {
+        groups[key] = [];
+      }
+      groups[key]!.add(record);
+    }
+
+    return groups;
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AttendanceProvider>(context);
     final allRecords = provider.records;
 
-    // Filter data berdasarkan tipe dan query pencarian
+    // Filter records by type, date preset, and search query
     final filteredRecords = allRecords.where((r) {
-      if (_selectedFilter == 'checkin' && r.type != 'checkin') return false;
-      if (_selectedFilter == 'checkout' && r.type != 'checkout') return false;
+      // 1. Type Filter
+      if (_selectedTypeFilter == 'checkin' && r.type != 'checkin') return false;
+      if (_selectedTypeFilter == 'checkout' && r.type != 'checkout') return false;
 
+      // 2. Date Filter
+      if (!_matchesDateFilter(r.timestamp)) return false;
+
+      // 3. Search Query Filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         final matchLocation = r.locationName.toLowerCase().contains(query);
         final matchType = r.type.toLowerCase().contains(query);
         return matchLocation || matchType;
       }
+
       return true;
     }).toList();
+
+    // Group filtered records by date string (yyyy-MM-dd)
+    final groupedRecords = _groupRecordsByDay(filteredRecords);
+    final sortedDateKeys = groupedRecords.keys.toList()
+      ..sort((a, b) => b.compareTo(a)); // Newest date first
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -60,7 +161,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       body: Column(
         children: [
-          // Filter & Search Header
+          // Filter & Search Controls Header
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: const BoxDecoration(
@@ -68,6 +169,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Search Input
                 TextField(
@@ -103,22 +205,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 const SizedBox(height: 10),
 
-                // Filter Chips (Semua, Masuk, Pulang) - Horizontally scrollable
+                // Date Filter Chips Row (Semua, Hari Ini, 7 Hari, Bulan Ini, Pilih Tanggal)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   child: Row(
                     children: [
-                      _buildFilterChip('Semua', 'all', allRecords.length),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Presensi Masuk',
+                      _buildDateFilterChip('Semua Waktu', DateFilterPreset.all),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip('Hari Ini', DateFilterPreset.today),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip('7 Hari Terakhir', DateFilterPreset.last7Days),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip('Bulan Ini', DateFilterPreset.thisMonth),
+                      const SizedBox(width: 6),
+                      _buildCustomDateRangeChip(),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Type Filter Chips Row (Semua Tipe, Masuk, Pulang)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildTypeFilterChip('Semua Sesi', 'all', allRecords.length),
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip(
+                        'Masuk',
                         'checkin',
                         allRecords.where((r) => r.type == 'checkin').length,
                       ),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Presensi Pulang',
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip(
+                        'Pulang',
                         'checkout',
                         allRecords.where((r) => r.type == 'checkout').length,
                       ),
@@ -129,20 +252,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
 
-          // List Riwayat
+          // Grouped List of Attendance Cards
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => provider.refreshAll(),
               color: AppColors.steelBlue,
-              child: filteredRecords.isEmpty
+              child: sortedDateKeys.isEmpty
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Padding(
                         padding: const EdgeInsets.only(top: 80),
                         child: EmptyStateView(
                           title: 'Belum Ada Riwayat',
-                          message: _searchQuery.isNotEmpty
-                              ? 'Tidak ditemukan riwayat yang cocok dengan pencarian Anda.'
+                          message: _searchQuery.isNotEmpty || _selectedDatePreset != DateFilterPreset.all
+                              ? 'Tidak ditemukan riwayat yang cocok dengan filter atau tanggal yang dipilih.'
                               : 'Presensi yang Anda lakukan di lapangan akan otomatis tercatat di sini.',
                           icon: Icons.history_rounded,
                         ),
@@ -150,14 +273,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: filteredRecords.length,
+                      itemCount: sortedDateKeys.length,
                       itemBuilder: (context, index) {
-                        final record = filteredRecords[index];
-                        return AttendanceHistoryCard(
-                          type: record.type,
-                          timestamp: record.timestamp,
-                          locationName: record.locationName,
-                          isSynced: record.syncStatus,
+                        final dateKey = sortedDateKeys[index];
+                        final dayRecords = groupedRecords[dateKey]!;
+                        final firstTimestamp = dayRecords.first.timestamp;
+                        final date = DateTime(
+                          firstTimestamp.year,
+                          firstTimestamp.month,
+                          firstTimestamp.day,
+                        );
+
+                        return DailyAttendanceGroupCard(
+                          date: date,
+                          records: dayRecords,
                         );
                       },
                     ),
@@ -168,13 +297,49 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value, int count) {
-    final isSelected = _selectedFilter == value;
+  Widget _buildDateFilterChip(String label, DateFilterPreset preset) {
+    final isSelected = _selectedDatePreset == preset;
     return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = value),
+      onTap: () {
+        setState(() {
+          _selectedDatePreset = preset;
+          if (preset != DateFilterPreset.custom) {
+            _customDateRange = null;
+          }
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.steelBlue : AppColors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.steelBlue : AppColors.borderSubtle,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.badgeText.copyWith(
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomDateRangeChip() {
+    final isSelected = _selectedDatePreset == DateFilterPreset.custom && _customDateRange != null;
+    final label = isSelected
+        ? '${DateFormat('d MMM').format(_customDateRange!.start)} - ${DateFormat('d MMM').format(_customDateRange!.end)}'
+        : 'Pilih Tanggal';
+
+    return GestureDetector(
+      onTap: _pickCustomDateRange,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.steelBlue : AppColors.background,
           borderRadius: BorderRadius.circular(8),
@@ -185,18 +350,67 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              Icons.calendar_month_rounded,
+              size: 13,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
             Text(
               label,
               style: AppTextStyles.badgeText.copyWith(
                 color: isSelected ? Colors.white : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedDatePreset = DateFilterPreset.all;
+                    _customDateRange = null;
+                  });
+                },
+                child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeFilterChip(String label, String value, int count) {
+    final isSelected = _selectedTypeFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTypeFilter = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.slateNavy : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? AppColors.slateNavy : AppColors.borderSubtle,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: AppTextStyles.badgeText.copyWith(
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+                fontSize: 11,
               ),
             ),
             const SizedBox(width: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(10),
+                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 '$count',

@@ -43,6 +43,8 @@ class AttendanceProvider extends ChangeNotifier {
   String get currentLocationName => _currentLocation?.locationName ?? 'Mendeteksi lokasi GPS...';
   String? get currentLatitude => _currentLocation?.latitude;
   String? get currentLongitude => _currentLocation?.longitude;
+  double? get currentAccuracy => _currentLocation?.accuracy;
+  bool get isCurrentMocked => _currentLocation?.isMocked ?? false;
 
   int get pendingSyncCount => _records.where((r) => !r.syncStatus).length;
 

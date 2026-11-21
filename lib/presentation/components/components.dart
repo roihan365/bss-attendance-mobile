@@ -10,6 +10,7 @@ export 'inputs/app_text_field.dart';
 export 'cards/hero_attendance_card.dart';
 export 'cards/location_info_card.dart';
 export 'cards/attendance_history_card.dart';
+export 'cards/daily_attendance_group_card.dart';
 
 // Feedback
 export 'feedback/offline_status_banner.dart';
