@@ -6,11 +6,15 @@ class LocationData {
   final String latitude;
   final String longitude;
   final String locationName;
+  final double? accuracy;
+  final bool isMocked;
 
   const LocationData({
     required this.latitude,
     required this.longitude,
     required this.locationName,
+    this.accuracy,
+    this.isMocked = false,
   });
 }
 

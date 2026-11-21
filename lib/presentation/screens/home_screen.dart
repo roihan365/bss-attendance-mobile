@@ -245,13 +245,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Location Card dengan Validasi GPS & Tombol Refresh
+                      // Location Card dengan Validasi GPS & Tombol Refresh + Peta & Kalibrasi
                       LocationInfoCard(
                         locationName: attendanceProvider.currentLocationName,
                         latitude: attendanceProvider.currentLatitude,
                         longitude: attendanceProvider.currentLongitude,
+                        accuracy: attendanceProvider.currentAccuracy,
                         isRefreshing: _isRefreshingGps,
                         onRefreshLocation: () => _handleRefreshGps(attendanceProvider),
+                        onCalibrateLocation: () => _handleRefreshGps(attendanceProvider),
                       ),
 
                       const SizedBox(height: 20),

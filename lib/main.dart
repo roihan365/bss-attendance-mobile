@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
+import 'core/security/anti_mock_location_service.dart';
 import 'core/theme/app_colors.dart';
 import 'presentation/providers/attendance_provider.dart';
 import 'presentation/providers/auth_provider.dart';
@@ -97,6 +98,20 @@ class AttendanceHomePageState extends State<AttendanceHomePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkDeviceSecurityOnStartup();
+  }
+
+  void _checkDeviceSecurityOnStartup() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final fraudCheck = await AntiMockLocationService.checkStartupIntegrity();
+      if (fraudCheck.isFraud && mounted) {
+        AntiMockLocationService.showFraudWarningDialog(
+          context,
+          fraudCheck.reason ??
+              'Aplikasi Fake GPS / manipulasi lokasi terdeteksi aktif pada perangkat Anda.',
+        );
+      }
+    });
   }
 
   @override

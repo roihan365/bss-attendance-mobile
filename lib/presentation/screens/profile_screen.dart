@@ -1,13 +1,98 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/di/injection.dart';
+import '../../core/security/biometric_auth_service.dart';
+import '../../core/security/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../components/components.dart';
 import '../providers/attendance_provider.dart';
 import '../providers/auth_provider.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final SecureStorageService _secureStorage = getIt<SecureStorageService>();
+  final BiometricAuthService _biometricAuth = getIt<BiometricAuthService>();
+
+  bool _isBiometricEnabled = false;
+  bool _isLoadingBiometric = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricPreference();
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    try {
+      final enabled = await _secureStorage.isBiometricEnabled();
+      if (mounted) {
+        setState(() {
+          _isBiometricEnabled = enabled;
+          _isLoadingBiometric = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingBiometric = false);
+      }
+    }
+  }
+
+  Future<void> _handleToggleBiometric(bool value) async {
+    if (value) {
+      final isAvailable = await _biometricAuth.isBiometricAvailable();
+      if (!isAvailable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sensor biometrik tidak tersedia atau belum didaftarkan di perangkat ini.'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+        return;
+      }
+
+      final authenticated = await _biometricAuth.authenticate(
+        reason: 'Pindai sidik jari atau wajah untuk mengaktifkan login biometrik',
+      );
+
+      if (!authenticated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verifikasi biometrik gagal.'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    await _secureStorage.setBiometricEnabled(value);
+    if (mounted) {
+      setState(() => _isBiometricEnabled = value);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value
+                ? 'Login Biometrik aktif. Anda dapat masuk dengan sidik jari/wajah.'
+                : 'Login Biometrik dinonaktifkan.',
+          ),
+          backgroundColor: value ? AppColors.emeraldGreen : AppColors.steelBlue,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context, AuthProvider authProvider) async {
     final confirm = await showDialog<bool>(
@@ -62,13 +147,164 @@ class ProfileScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Gagal sinkronisasi: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text('Gagal sinkronisasi: ${e.toString().replaceFirst('Exception: ', '')}'),
             backgroundColor: AppColors.errorRed,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
+  }
+
+  void _showSopBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightBlueBackground,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.menu_book_rounded, color: AppColors.steelBlue, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('SOP Presensi Lapangan', style: AppTextStyles.h2),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildSopItem('1', 'Jam Operasional Presensi', 'Presensi Masuk dibuka mulai 06:30 hingga 08:30 WIB. Presensi Pulang dapat dilakukan setelah pukul 17:00 WIB.'),
+              const SizedBox(height: 12),
+              _buildSopItem('2', 'Validasi Lokasi & Fake GPS', 'Aplikasi dilengkapi proteksi Anti-Mock Location. Penggunaan Fake GPS atau simulator akan otomatis menggugurkan catatan kehadiran.'),
+              const SizedBox(height: 12),
+              _buildSopItem('3', 'Mode Luar Jaringan (Offline-First)', 'Di lokasi proyek tanpa sinyal internet, presensi tetap tersimpan otomatis di perangkat dan akan disinkronkan saat sinyal terdeteksi kembali.'),
+              const SizedBox(height: 12),
+              _buildSopItem('4', 'Kendala & Pengaduan', 'Jika mengalami kendala teknis atau pergeseran titik koordinat, segera hubungi Divisi HRD Site Operasional.'),
+              const SizedBox(height: 20),
+              AppButton(
+                text: 'Saya Mengerti',
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSopItem(String number, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: AppColors.lightBlueBackground,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: AppTextStyles.badgeText.copyWith(color: AppColors.steelBlue, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(description, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showHelpdeskDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.support_agent_rounded, color: AppColors.steelBlue),
+            const SizedBox(width: 10),
+            Text('Pusat Bantuan HRD', style: AppTextStyles.h2),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Silakan hubungi perwakilan HRD Site melalui kontak berikut:',
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            _buildContactRow(Icons.email_outlined, 'Email HRD', 'hr.operations@bss.co.id'),
+            const SizedBox(height: 8),
+            _buildContactRow(Icons.phone_outlined, 'Hotline HRD', '+62 811-2345-6789'),
+            const SizedBox(height: 8),
+            _buildContactRow(Icons.schedule_rounded, 'Jam Layanan', 'Senin - Jumat, 08:00 - 17:00 WIB'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Tutup', style: AppTextStyles.buttonText.copyWith(color: AppColors.steelBlue)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.steelBlue),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted)),
+              Text(value, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -79,6 +315,7 @@ class ProfileScreen extends StatelessWidget {
     final user = authProvider.currentUser;
     final userName = user?.name ?? 'Karyawan PT BSS';
     final userEmail = user?.email ?? 'karyawan@bss.co.id';
+    final userId = user?.id != null ? 'BSS-${user!.id.toString().padLeft(4, '0')}' : 'BSS-0001';
     final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'B';
 
     final totalCheckIns = attendanceProvider.records.where((r) => r.type == 'checkin').length;
@@ -185,7 +422,7 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Security & Integrity Info Card
+            // Section 1: Detail Kepegawaian & Pekerjaan
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -196,20 +433,140 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Integritas & Keamanan Perangkat', style: AppTextStyles.h3),
-                  const SizedBox(height: 12),
-                  _buildSecurityRow(Icons.gps_fixed_rounded, 'Anti-Mock GPS (Fake GPS)', 'Aktif & Terproteksi'),
-                  const Divider(height: 16, color: AppColors.borderSubtle),
-                  _buildSecurityRow(Icons.vpn_key_rounded, 'Penyimpanan Enkripsi Keystore', 'Aktif'),
-                  const Divider(height: 16, color: AppColors.borderSubtle),
-                  _buildSecurityRow(Icons.storage_rounded, 'Database Lokal SQLite', 'Aktif (Offline-First)'),
+                  Row(
+                    children: [
+                      const Icon(Icons.badge_outlined, size: 20, color: AppColors.steelBlue),
+                      const SizedBox(width: 8),
+                      Text('Data & Detail Kepegawaian', style: AppTextStyles.h3),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildEmploymentRow('ID Karyawan / NIP', userId),
+                  const Divider(height: 18, color: AppColors.borderSubtle),
+                  _buildEmploymentRow('Departemen', 'Operasional & Engineering Site'),
+                  const Divider(height: 18, color: AppColors.borderSubtle),
+                  _buildEmploymentRow('Shift Kerja', 'Reguler (08:00 - 17:00 WIB)'),
+                  const Divider(height: 18, color: AppColors.borderSubtle),
+                  _buildEmploymentRow('Penempatan', 'Site Balikpapan / Regional Timur'),
+                  const Divider(height: 18, color: AppColors.borderSubtle),
+                  _buildEmploymentRow('Status Karyawan', 'Karyawan Tetap (Aktif)', isHighlight: true),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Offline Sync Manual Action Card
+            // Section 2: Pengaturan Akun & Keamanan Biometrik
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.borderSubtle, width: 1.2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.security_rounded, size: 20, color: AppColors.steelBlue),
+                      const SizedBox(width: 8),
+                      Text('Keamanan & Akses Akun', style: AppTextStyles.h3),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightBlueBackground,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.fingerprint_rounded, color: AppColors.steelBlue, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Login Biometrik', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                            Text(
+                              'Masuk menggunakan Sidik Jari / Face ID',
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isLoadingBiometric)
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Switch(
+                          value: _isBiometricEnabled,
+                          activeThumbColor: AppColors.steelBlue,
+                          onChanged: _handleToggleBiometric,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Section 3: Pusat Bantuan & Kebijakan HRD
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.borderSubtle, width: 1.2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.help_outline_rounded, size: 20, color: AppColors.steelBlue),
+                      const SizedBox(width: 8),
+                      Text('Pusat Bantuan & Kebijakan HR', style: AppTextStyles.h3),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: const Icon(Icons.menu_book_outlined, color: AppColors.steelBlue),
+                      title: Text('SOP & Regulasi Presensi Lapangan', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                      onTap: () => _showSopBottomSheet(context),
+                    ),
+                  ),
+                  const Divider(height: 8, color: AppColors.borderSubtle),
+                  Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: const Icon(Icons.support_agent_rounded, color: AppColors.steelBlue),
+                      title: Text('Hubungi Helpdesk HRD Site', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                      onTap: () => _showHelpdeskDialog(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Offline Sync Manual Action Card (if any pending)
             if (pendingCount > 0)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -277,21 +634,34 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSecurityRow(IconData icon, String title, String subtitle) {
+  Widget _buildEmploymentRow(String label, String value, {bool isHighlight = false}) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Icon(icon, size: 20, color: AppColors.steelBlue),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
-              Text(subtitle, style: AppTextStyles.bodySmall.copyWith(color: AppColors.emeraldGreen)),
-            ],
-          ),
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
         ),
-        const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.emeraldGreen),
+        if (isHighlight)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.emeraldGreenLight,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              value,
+              style: AppTextStyles.badgeText.copyWith(
+                color: AppColors.emeraldGreen,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          )
+        else
+          Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+          ),
       ],
     );
   }
