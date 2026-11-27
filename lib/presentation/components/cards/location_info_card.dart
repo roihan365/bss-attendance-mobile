@@ -201,14 +201,21 @@ class _LocationInfoCardState extends State<LocationInfoCard> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Lokasi Site / Proyek',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                          Expanded(
+                            child: Text(
+                              'Lokasi Site / Proyek',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (hasCoords) _buildAccuracyBadge(),
+                          if (hasCoords) ...[
+                            const SizedBox(width: 6),
+                            _buildAccuracyBadge(),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -263,14 +270,18 @@ class _LocationInfoCardState extends State<LocationInfoCard> {
                     color: AppColors.steelBlue,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    _isExpanded ? 'Sembunyikan Peta & Kalibrasi' : 'Lihat Peta & Kalibrasi Akurasi GPS',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.steelBlue,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      _isExpanded ? 'Sembunyikan Peta & Kalibrasi' : 'Lihat Peta & Kalibrasi Akurasi GPS',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.steelBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 4),
                   Icon(
                     _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                     size: 18,
@@ -425,11 +436,11 @@ class _LocationInfoCardState extends State<LocationInfoCard> {
                 child: OutlinedButton.icon(
                   onPressed: _openGoogleMaps,
                   icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                  label: const Text('Buka Maps'),
+                  label: const Text('Buka Maps', maxLines: 1, overflow: TextOverflow.ellipsis),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.steelBlue,
                     side: const BorderSide(color: AppColors.steelBlue),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
@@ -445,11 +456,15 @@ class _LocationInfoCardState extends State<LocationInfoCard> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.tune_rounded, size: 16),
-                  label: Text(_isCalibrating ? 'Mengalibrasi...' : 'Kalibrasi GPS'),
+                  label: Text(
+                    _isCalibrating ? 'Kalibrasi...' : 'Kalibrasi GPS',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.steelBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),

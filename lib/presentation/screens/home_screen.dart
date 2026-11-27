@@ -181,28 +181,55 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // App Bar Header (Industrial Title)
+                      // App Bar Header (Industrial Title + BSS Logo)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PT BUMI SUKSES SINERGI',
-                                style: AppTextStyles.badgeText.copyWith(
-                                  color: AppColors.steelBlue,
-                                  letterSpacing: 1.0,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppColors.borderSubtle),
+                                  ),
+                                  child: Image.asset(
+                                    'assets/images/bss_logo.png',
+                                    height: 30,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Presensi Lapangan',
-                                style: AppTextStyles.h1.copyWith(fontSize: 22),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'PT BARITO SAMUDRA SEJAHTERA',
+                                        style: AppTextStyles.badgeText.copyWith(
+                                          color: AppColors.steelBlue,
+                                          letterSpacing: 0.8,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Presensi Karyawan',
+                                        style: AppTextStyles.h1.copyWith(fontSize: 20),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          if (attendanceProvider.pendingSyncCount > 0)
+                          if (attendanceProvider.pendingSyncCount > 0) ...[
+                            const SizedBox(width: 8),
                             GestureDetector(
                               onTap: () => attendanceProvider.syncPending(),
                               child: Container(
@@ -213,6 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   border: Border.all(color: AppColors.safetyAmber.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.sync_rounded, size: 14, color: AppColors.safetyAmber),
                                     const SizedBox(width: 4),
@@ -224,6 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
+                          ],
                         ],
                       ),
 
@@ -334,6 +363,36 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    if (provider.todayStatus.onLeave) {
+      final leaveTitle = provider.todayStatus.leave?.leaveTypeName ?? 'Izin / Cuti';
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.safetyAmberLight,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.safetyAmber.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.event_available_rounded, color: AppColors.safetyAmber, size: 22),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Sedang Dalam Masa $leaveTitle',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.safetyAmber,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (isCheckedOut) {
       return Container(
         height: 56,
@@ -353,6 +412,40 @@ class _HomeScreenState extends State<HomeScreen> {
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.steelBlue,
                 fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!provider.isWithinWorkRadius && (canCheckIn || canCheckOut)) {
+      final eval = provider.geofenceEvaluation;
+      final distText = eval?.distanceMeters != null ? '${eval!.distanceMeters!.round()}m' : 'jauh';
+      final locName = eval?.nearestLocation?.name ?? 'Lokasi Kerja';
+      final maxRadius = eval?.nearestLocation?.radiusMeters ?? 0;
+
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.errorRedLight,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_off_rounded, color: AppColors.errorRed, size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Di luar radius $locName ($distText / maks ${maxRadius}m)',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.errorRed,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

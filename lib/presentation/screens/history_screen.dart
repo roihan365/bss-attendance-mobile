@@ -146,6 +146,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 14, top: 10, bottom: 10),
+          child: Image.asset('assets/images/bss_logo.png', fit: BoxFit.contain),
+        ),
         title: Text('Riwayat Presensi', style: AppTextStyles.h2),
         backgroundColor: Colors.white,
         elevation: 0,

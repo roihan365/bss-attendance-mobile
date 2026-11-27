@@ -1,6 +1,6 @@
 # BSS Attendance Mobile
 
-Aplikasi Presensi Mobile Karyawan Operasional & Lapangan **PT Bumi Sukses Sinergi**. Dibangun dengan **Flutter** menerapkan standar **Clean Architecture**, **Arsitektur Offline-First Sejati (SQLite)**, **Desain Berbasis Komponen Modular**, dan **Proteksi Keamanan Tingkat Tinggi (Mobile Security Hardening)**.
+Aplikasi Presensi Mobile Karyawan Operasional & Lapangan **PT BARITO SAMUDRA SEJAHTERA**. Dibangun dengan **Flutter** menerapkan standar **Clean Architecture**, **Arsitektur Offline-First Sejati (SQLite)**, **Desain Berbasis Komponen Modular**, dan **Proteksi Keamanan Tingkat Tinggi (Mobile Security Hardening)**.
 
 ---
 

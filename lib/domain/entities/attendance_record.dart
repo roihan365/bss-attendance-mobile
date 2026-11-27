@@ -8,6 +8,9 @@ class AttendanceRecord {
   final String latitude;
   final String longitude;
   final String locationName;
+  final int? workLocationId;
+  final int? distanceMeters;
+  final bool isOutOfRange;
   final bool syncStatus;
   final String? syncError;
 
@@ -21,6 +24,9 @@ class AttendanceRecord {
     required this.latitude,
     required this.longitude,
     this.locationName = 'Unknown Location',
+    this.workLocationId,
+    this.distanceMeters,
+    this.isOutOfRange = false,
     this.syncStatus = false,
     this.syncError,
   });
@@ -35,6 +41,9 @@ class AttendanceRecord {
     String? latitude,
     String? longitude,
     String? locationName,
+    int? workLocationId,
+    int? distanceMeters,
+    bool? isOutOfRange,
     bool? syncStatus,
     String? syncError,
   }) {
@@ -48,6 +57,9 @@ class AttendanceRecord {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       locationName: locationName ?? this.locationName,
+      workLocationId: workLocationId ?? this.workLocationId,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      isOutOfRange: isOutOfRange ?? this.isOutOfRange,
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: syncError ?? this.syncError,
     );

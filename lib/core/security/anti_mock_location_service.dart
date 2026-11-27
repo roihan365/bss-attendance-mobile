@@ -144,7 +144,7 @@ class AntiMockLocationService {
             ),
             const SizedBox(height: 12),
             Text(
-              'PT Bumi Sukses Sinergi menerapkan sistem Anti-Fraud ketat. Segala bentuk manipulasi GPS atau penggunaan Fake GPS dilarang dan dapat menyebabkan presensi ditolak serta tercatat di sistem audit HRD.',
+              'PT BARITO SAMUDRA SEJAHTERA menerapkan sistem Anti-Fraud ketat. Segala bentuk manipulasi GPS atau penggunaan Fake GPS dilarang dan dapat menyebabkan presensi ditolak serta tercatat di sistem audit HRD.',
               style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
             ),
           ],

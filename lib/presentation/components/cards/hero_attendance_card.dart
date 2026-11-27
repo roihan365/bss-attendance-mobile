@@ -119,6 +119,7 @@ class _HeroAttendanceCardState extends State<HeroAttendanceCard> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(

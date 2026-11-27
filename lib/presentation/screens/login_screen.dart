@@ -70,20 +70,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Industrial / Enterprise Badge Logo
+                  // Enterprise Logo PT BSS
                   Center(
                     child: Container(
-                      width: 64,
-                      height: 64,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       decoration: BoxDecoration(
-                        color: AppColors.lightBlueBackground,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.steelBlue.withValues(alpha: 0.2), width: 1.5),
+                        border: Border.all(color: AppColors.borderSubtle, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.domain_rounded,
-                        color: AppColors.steelBlue,
-                        size: 32,
+                      child: Image.asset(
+                        'assets/images/bss_logo.png',
+                        height: 68,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),

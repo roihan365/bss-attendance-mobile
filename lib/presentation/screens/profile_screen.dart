@@ -194,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: const Icon(Icons.menu_book_rounded, color: AppColors.steelBlue, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  Text('SOP Presensi Lapangan', style: AppTextStyles.h2),
+                  Text('SOP Presensi Karyawan', style: AppTextStyles.h2),
                 ],
               ),
               const SizedBox(height: 16),
@@ -325,6 +325,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 14, top: 10, bottom: 10),
+          child: Image.asset('assets/images/bss_logo.png', fit: BoxFit.contain),
+        ),
         title: Text('Profil Karyawan', style: AppTextStyles.h2),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -375,7 +379,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'Karyawan Operasional Lapangan',
+                            user?.positionTitle ?? 'Karyawan Operasional Lapangan',
                             style: AppTextStyles.badgeText.copyWith(color: AppColors.steelBlue, fontSize: 10),
                           ),
                         ),
@@ -443,11 +447,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 14),
                   _buildEmploymentRow('ID Karyawan / NIP', userId),
                   const Divider(height: 18, color: AppColors.borderSubtle),
-                  _buildEmploymentRow('Departemen', 'Operasional & Engineering Site'),
+                  _buildEmploymentRow('Divisi / Departemen', user?.division?.name ?? 'Operasional & Engineering Site'),
                   const Divider(height: 18, color: AppColors.borderSubtle),
-                  _buildEmploymentRow('Shift Kerja', 'Reguler (08:00 - 17:00 WIB)'),
+                  _buildEmploymentRow(
+                    'Atasan Langsung',
+                    user?.supervisor?.name ?? '-',
+                  ),
                   const Divider(height: 18, color: AppColors.borderSubtle),
-                  _buildEmploymentRow('Penempatan', 'Site Balikpapan / Regional Timur'),
+                  _buildEmploymentRow(
+                    'Mode & Lokasi Kerja',
+                    (user?.isFlexibleLocation == true || attendanceProvider.effectiveIsFlexibleLocation)
+                        ? 'Lokasi Fleksibel (Bebas Radius)'
+                        : (attendanceProvider.effectiveWorkLocations.isNotEmpty
+                            ? attendanceProvider.effectiveWorkLocations
+                                .map((w) => '${w.name} (Maks ${w.radiusMeters}m)')
+                                .join(', ')
+                            : 'Site Operasional'),
+                  ),
                   const Divider(height: 18, color: AppColors.borderSubtle),
                   _buildEmploymentRow('Status Karyawan', 'Karyawan Tetap (Aktif)', isHighlight: true),
                 ],
@@ -543,7 +559,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       leading: const Icon(Icons.menu_book_outlined, color: AppColors.steelBlue),
-                      title: Text('SOP & Regulasi Presensi Lapangan', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                      title: Text('SOP & Regulasi Presensi Karyawan', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
                       trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                       onTap: () => _showSopBottomSheet(context),
                     ),
@@ -613,8 +629,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 24),
+            Image.asset(
+              'assets/images/bss_logo.png',
+              height: 36,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
             Text(
-              'BSS Attendance Mobile v1.0.0 (Build 1)\nPT Bumi Sukses Sinergi',
+              'BSS Attendance Mobile v1.0.0 (Build 1)\nPT BARITO SAMUDRA SEJAHTERA',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
             ),
@@ -658,9 +680,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           )
         else
-          Text(
-            value,
-            style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
       ],
     );

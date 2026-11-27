@@ -1,8 +1,11 @@
+import '../../core/network/api_exceptions.dart';
 import '../../core/utils/app_logger.dart';
+import '../../core/utils/geofence_helper.dart';
 import '../../core/utils/uuid_helper.dart';
 import '../../domain/entities/attendance_record.dart';
 import '../../domain/entities/sync_batch_result.dart';
 import '../../domain/entities/today_status.dart';
+import '../../domain/entities/user.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
 import '../datasources/attendance_remote_data_source.dart';
 import '../datasources/connectivity_service.dart';
@@ -15,6 +18,7 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
   final IAttendanceRemoteDataSourceNew remoteDataSource;
   final ConnectivityService connectivityService;
   final Future<String?> Function() getUserId;
+  final Future<User?> Function()? getCurrentUser;
 
   AttendanceRecord? _currentCheckIn;
   bool _isCheckedIn = false;
@@ -25,6 +29,7 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
     required this.remoteDataSource,
     required this.connectivityService,
     required this.getUserId,
+    this.getCurrentUser,
   });
 
   @override
@@ -67,12 +72,15 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
 
     final hasCheckIn = checkIn != null;
     final hasCheckOut = checkOut != null;
+    final user = getCurrentUser != null ? await getCurrentUser!() : null;
 
     final status = TodayStatus(
       checkedIn: hasCheckIn,
       checkedOut: hasCheckOut,
       canCheckIn: !hasCheckIn,
       canCheckOut: hasCheckIn && !hasCheckOut,
+      isFlexibleLocation: user?.isFlexibleLocation ?? false,
+      workLocations: user?.workLocations ?? const [],
       checkIn: checkIn,
       checkOut: checkOut,
     );
@@ -83,16 +91,43 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
     return status;
   }
 
+  void _validateGeofence(TodayStatus status, LocationData location) {
+    final lat = double.tryParse(location.latitude) ?? 0.0;
+    final lng = double.tryParse(location.longitude) ?? 0.0;
+
+    final evaluation = GeofenceHelper.evaluate(
+      latitude: lat,
+      longitude: lng,
+      isFlexibleLocation: status.isFlexibleLocation,
+      workLocations: status.workLocations,
+    );
+
+    if (!evaluation.isWithinRadius && evaluation.nearestLocation != null) {
+      final dist = evaluation.distanceMeters?.round() ?? 0;
+      final loc = evaluation.nearestLocation!;
+      throw ValidationException(
+        message:
+            'Lokasi Anda berada di luar radius lokasi kerja yang diizinkan (${dist}m dari ${loc.name}, maksimal ${loc.radiusMeters}m).',
+      );
+    }
+  }
+
   @override
   Future<AttendanceRecord> checkIn(String userId) async {
     final status = await getTodayStatus();
+    if (status.onLeave) {
+      throw ValidationException(
+        message: 'Anda sedang dalam masa izin hari ini sehingga tidak perlu melakukan presensi.',
+      );
+    }
     if (!status.canCheckIn) {
       throw Exception('Anda sudah melakukan presensi masuk hari ini.');
     }
 
     final location = await locationService.getCurrentLocation();
-    final recordUuid = UuidHelper.generate();
+    _validateGeofence(status, location);
 
+    final recordUuid = UuidHelper.generate();
     final record = AttendanceRecord(
       id: recordUuid,
       uuid: recordUuid,
@@ -105,43 +140,56 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
       syncStatus: false,
     );
 
-    // 1. Simpan selalu ke penyimpanan lokal terlebih dahulu (Offline-First)
-    await saveRecord(record);
-    AppLogger.i('ATTENDANCE', '💾 Presensi Masuk disimpan ke SQLite lokal (UUID: $recordUuid, Lat: ${location.latitude}, Long: ${location.longitude})');
-
-    // 2. Jika online, langsung kirim ke server secara real-time
     final hasInternet = await connectivityService.hasInternet();
     AppLogger.i('ATTENDANCE', '📡 Memeriksa status koneksi internet: hasInternet=$hasInternet');
 
     if (hasInternet) {
       try {
         AppLogger.i('ATTENDANCE', '🚀 Mengirim absensi masuk ke server real-time (POST /attendance/save)...');
-        final synced = await remoteDataSource.sendAttendance(record);
+        final synced = (await remoteDataSource.sendAttendance(record)).copyWith(
+          syncStatus: true,
+          syncError: null,
+        );
         AppLogger.i('ATTENDANCE', 'SUKSES terkirim ke server! Server ID: ${synced.serverId}, syncStatus: ${synced.syncStatus}');
         await saveRecord(synced);
         return synced;
+      } on ValidationException {
+        rethrow;
+      } on ApiException catch (e, stack) {
+        if (e is NetworkException || e is ServerException) {
+          AppLogger.e('ATTENDANCE', '❌ Koneksi/Server bermasalah, menyimpan ke antrean offline: $e', e, stack);
+          await saveRecord(record.copyWith(syncError: e.toString()));
+          return record;
+        }
+        rethrow;
       } catch (e, stack) {
-        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, record tetap tersimpan di SQLite sebagai antrean pending: $e', e, stack);
-        final failedRecord = record.copyWith(syncError: e.toString());
-        await saveRecord(failedRecord);
+        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, menyimpan ke antrean offline: $e', e, stack);
+        await saveRecord(record.copyWith(syncError: e.toString()));
+        return record;
       }
     } else {
-      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi masuk disimpan sebagai antrean offline.');
+      await saveRecord(record);
+      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi masuk disimpan sebagai antrean offline (UUID: $recordUuid).');
+      return record;
     }
-
-    return record;
   }
 
   @override
   Future<AttendanceRecord> checkOut(String userId) async {
     final status = await getTodayStatus();
+    if (status.onLeave) {
+      throw ValidationException(
+        message: 'Anda sedang dalam masa izin hari ini sehingga tidak perlu melakukan presensi.',
+      );
+    }
     if (!status.canCheckOut) {
       throw Exception('Anda tidak dapat melakukan presensi pulang saat ini.');
     }
 
     final location = await locationService.getCurrentLocation();
-    final recordUuid = UuidHelper.generate();
+    _validateGeofence(status, location);
 
+    final recordUuid = UuidHelper.generate();
     final record = AttendanceRecord(
       id: recordUuid,
       uuid: recordUuid,
@@ -154,29 +202,38 @@ class AttendanceRepositoryImpl implements IAttendanceRepository {
       syncStatus: false,
     );
 
-    await saveRecord(record);
-    AppLogger.i('ATTENDANCE', '💾 Presensi Pulang disimpan ke SQLite lokal (UUID: $recordUuid)');
-
     final hasInternet = await connectivityService.hasInternet();
     AppLogger.i('ATTENDANCE', '📡 Memeriksa status koneksi internet: hasInternet=$hasInternet');
 
     if (hasInternet) {
       try {
         AppLogger.i('ATTENDANCE', '🚀 Mengirim absensi pulang ke server real-time (POST /attendance/save)...');
-        final synced = await remoteDataSource.sendAttendance(record);
+        final synced = (await remoteDataSource.sendAttendance(record)).copyWith(
+          syncStatus: true,
+          syncError: null,
+        );
         AppLogger.i('ATTENDANCE', 'SUKSES terkirim ke server! Server ID: ${synced.serverId}, syncStatus: ${synced.syncStatus}');
         await saveRecord(synced);
         return synced;
+      } on ValidationException {
+        rethrow;
+      } on ApiException catch (e, stack) {
+        if (e is NetworkException || e is ServerException) {
+          AppLogger.e('ATTENDANCE', '❌ Koneksi/Server bermasalah, menyimpan ke antrean offline: $e', e, stack);
+          await saveRecord(record.copyWith(syncError: e.toString()));
+          return record;
+        }
+        rethrow;
       } catch (e, stack) {
-        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, record tetap tersimpan di SQLite sebagai antrean pending: $e', e, stack);
-        final failedRecord = record.copyWith(syncError: e.toString());
-        await saveRecord(failedRecord);
+        AppLogger.e('ATTENDANCE', '❌ GAGAL mengirim ke API real-time, menyimpan ke antrean offline: $e', e, stack);
+        await saveRecord(record.copyWith(syncError: e.toString()));
+        return record;
       }
     } else {
-      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi pulang disimpan sebagai antrean offline.');
+      await saveRecord(record);
+      AppLogger.w('ATTENDANCE', '⚠️ Perangkat offline. Presensi pulang disimpan sebagai antrean offline (UUID: $recordUuid).');
+      return record;
     }
-
-    return record;
   }
 
   @override

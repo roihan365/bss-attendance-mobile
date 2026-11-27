@@ -13,6 +13,9 @@ class AttendanceModel extends AttendanceRecord {
     required super.latitude,
     required super.longitude,
     super.locationName = 'Unknown Location',
+    super.workLocationId,
+    super.distanceMeters,
+    super.isOutOfRange = false,
     super.syncStatus = false,
     super.syncError,
   });
@@ -28,6 +31,9 @@ class AttendanceModel extends AttendanceRecord {
       latitude: record.latitude,
       longitude: record.longitude,
       locationName: record.locationName,
+      workLocationId: record.workLocationId,
+      distanceMeters: record.distanceMeters,
+      isOutOfRange: record.isOutOfRange,
       syncStatus: record.syncStatus,
       syncError: record.syncError,
     );
@@ -50,7 +56,12 @@ class AttendanceModel extends AttendanceRecord {
       latitude: json['latitude']?.toString() ?? '0.0',
       longitude: json['longitude']?.toString() ?? '0.0',
       locationName: json['location_name']?.toString() ?? 'Lokasi Terdaftar',
-      syncStatus: json['sync_status'] == true || json['sync_status'] == 1,
+      workLocationId: int.tryParse(json['work_location_id']?.toString() ?? ''),
+      distanceMeters: int.tryParse(json['distance_meters']?.toString() ?? ''),
+      isOutOfRange: json['is_out_of_range'] == true || json['is_out_of_range'] == 1,
+      syncStatus: json['sync_status'] == null
+          ? true
+          : (json['sync_status'] == true || json['sync_status'] == 1),
     );
   }
 

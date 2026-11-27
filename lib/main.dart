@@ -8,8 +8,10 @@ import 'core/security/anti_mock_location_service.dart';
 import 'core/theme/app_colors.dart';
 import 'presentation/providers/attendance_provider.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/leave_provider.dart';
 import 'presentation/screens/history_screen.dart';
 import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/leave_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/profile_screen.dart';
 
@@ -32,6 +34,16 @@ void main() async {
               return previous;
             }
             return getIt<AttendanceProvider>(param1: authProvider);
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, LeaveProvider>(
+          create: (_) => getIt<LeaveProvider>(param1: null),
+          update: (_, authProvider, previous) {
+            if (previous != null) {
+              previous.updateAuth(authProvider);
+              return previous;
+            }
+            return getIt<LeaveProvider>(param1: authProvider);
           },
         ),
       ],
@@ -146,7 +158,12 @@ class AttendanceHomePageState extends State<AttendanceHomePage>
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
-          children: const [HomeScreen(), HistoryScreen(), ProfileScreen()],
+          children: const [
+            HomeScreen(),
+            HistoryScreen(),
+            LeaveScreen(),
+            ProfileScreen(),
+          ],
         ),
       ),
       bottomNavigationBar: Container(
@@ -176,6 +193,11 @@ class AttendanceHomePageState extends State<AttendanceHomePage>
             BottomNavigationBarItem(
               icon: Icon(Icons.history_rounded),
               label: 'Riwayat',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.event_note_outlined),
+              activeIcon: Icon(Icons.event_note_rounded),
+              label: 'Izin',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline_rounded),

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:bss_attendance_new/presentation/providers/attendance_provider.dart';
 import 'package:bss_attendance_new/presentation/providers/auth_provider.dart';
+import 'package:bss_attendance_new/presentation/providers/leave_provider.dart';
 import 'package:bss_attendance_new/main.dart';
 import 'package:bss_attendance_new/core/di/injection.dart';
 import 'package:bss_attendance_new/core/config/app_config.dart';
@@ -18,12 +19,14 @@ void main() {
   testWidgets('AttendanceHomePage registers WidgetsBindingObserver and handles resume', (tester) async {
     final authProvider = getIt<AuthProvider>();
     final attendanceProvider = getIt<AttendanceProvider>(param1: authProvider);
+    final leaveProvider = getIt<LeaveProvider>(param1: authProvider);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
           ChangeNotifierProvider<AttendanceProvider>.value(value: attendanceProvider),
+          ChangeNotifierProvider<LeaveProvider>.value(value: leaveProvider),
         ],
         child: const MaterialApp(
           home: AttendanceHomePage(),

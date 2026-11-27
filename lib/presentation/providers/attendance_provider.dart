@@ -1,10 +1,12 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../../core/utils/app_logger.dart';
+import '../../core/utils/geofence_helper.dart';
 import '../../data/datasources/connectivity_service.dart';
 import '../../domain/entities/attendance_record.dart';
 import '../../domain/entities/sync_batch_result.dart';
 import '../../domain/entities/today_status.dart';
+import '../../domain/entities/work_location.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
 import '../../domain/usecases/check_in.dart';
 import '../../domain/usecases/check_out.dart';
@@ -45,6 +47,29 @@ class AttendanceProvider extends ChangeNotifier {
   String? get currentLongitude => _currentLocation?.longitude;
   double? get currentAccuracy => _currentLocation?.accuracy;
   bool get isCurrentMocked => _currentLocation?.isMocked ?? false;
+
+  bool get effectiveIsFlexibleLocation =>
+      _todayStatus.isFlexibleLocation || (authProvider?.currentUser?.isFlexibleLocation ?? false);
+
+  List<WorkLocation> get effectiveWorkLocations => _todayStatus.workLocations.isNotEmpty
+      ? _todayStatus.workLocations
+      : (authProvider?.currentUser?.workLocations ?? const []);
+
+  GeofenceEvaluation? get geofenceEvaluation {
+    if (_currentLocation == null) return null;
+    final lat = double.tryParse(_currentLocation!.latitude);
+    final lng = double.tryParse(_currentLocation!.longitude);
+    if (lat == null || lng == null) return null;
+
+    return GeofenceHelper.evaluate(
+      latitude: lat,
+      longitude: lng,
+      isFlexibleLocation: effectiveIsFlexibleLocation,
+      workLocations: effectiveWorkLocations,
+    );
+  }
+
+  bool get isWithinWorkRadius => geofenceEvaluation?.isWithinRadius ?? true;
 
   int get pendingSyncCount => _records.where((r) => !r.syncStatus).length;
 

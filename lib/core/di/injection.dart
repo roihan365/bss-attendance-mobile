@@ -9,11 +9,14 @@ import '../../data/datasources/connectivity_service.dart';
 import '../../data/datasources/geolocator_location_service.dart';
 import '../../data/datasources/i_attendance_local_data_source.dart';
 import '../../data/datasources/i_location_service.dart';
+import '../../data/datasources/leave_remote_data_source.dart';
 import '../../data/datasources/sqlite_attendance_local_data_source.dart';
 import '../../data/repositories/attendance_repository_impl.dart';
 import '../../data/repositories/auth_repository_impl.dart';
+import '../../data/repositories/leave_repository_impl.dart';
 import '../../domain/repositories/i_attendance_repository.dart';
 import '../../domain/repositories/i_auth_repository.dart';
+import '../../domain/repositories/i_leave_repository.dart';
 import '../../domain/usecases/check_in.dart';
 import '../../domain/usecases/check_out.dart';
 import '../../domain/usecases/get_all_records.dart';
@@ -29,6 +32,7 @@ import '../../domain/usecases/sync_attendance.dart';
 import '../../domain/usecases/sync_batch_offline.dart';
 import '../../presentation/providers/attendance_provider.dart';
 import '../../presentation/providers/auth_provider.dart';
+import '../../presentation/providers/leave_provider.dart';
 import '../network/dio_client.dart';
 
 final getIt = GetIt.instance;
@@ -72,6 +76,9 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton<ConnectivityService>(
     () => ConnectivityService(),
   );
+  getIt.registerLazySingleton<ILeaveRemoteDataSource>(
+    () => LeaveRemoteDataSource(dioClient: getIt()),
+  );
 
   // 3. Repositories
   getIt.registerLazySingleton<IAuthRepository>(
@@ -87,7 +94,11 @@ Future<void> initDependencies() async {
       remoteDataSource: getIt(),
       connectivityService: getIt(),
       getUserId: () async => (await getIt<IAuthRepository>().getCurrentUser())?.id,
+      getCurrentUser: () => getIt<IAuthRepository>().getCurrentUser(),
     ),
+  );
+  getIt.registerLazySingleton<ILeaveRepository>(
+    () => LeaveRepositoryImpl(remoteDataSource: getIt()),
   );
 
   // 4. Use Cases - Auth
@@ -133,6 +144,12 @@ Future<void> initDependencies() async {
       getCurrentLocationUseCase: getIt(),
       syncBatchOfflineUseCase: getIt(),
       connectivityService: getIt(),
+      authProvider: authProvider,
+    ),
+  );
+  getIt.registerFactoryParam<LeaveProvider, AuthProvider?, void>(
+    (authProvider, _) => LeaveProvider(
+      leaveRepository: getIt(),
       authProvider: authProvider,
     ),
   );
