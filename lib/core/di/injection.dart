@@ -128,12 +128,17 @@ Future<void> initDependencies() async {
 
   // 7. Presentation Providers
   getIt.registerFactory(
-    () => AuthProvider(
-      loginUseCase: getIt(),
-      logoutUseCase: getIt(),
-      getCurrentUserUseCase: getIt(),
-      refreshUserProfileUseCase: getIt(),
-    ),
+    () {
+      final authProvider = AuthProvider(
+        loginUseCase: getIt(),
+        logoutUseCase: getIt(),
+        getCurrentUserUseCase: getIt(),
+        refreshUserProfileUseCase: getIt(),
+        clearLocalSession: () => getIt<IAuthRepository>().clearUser(),
+      );
+      getIt<DioClient>().onUnauthorized = authProvider.handleSessionExpired;
+      return authProvider;
+    },
   );
   getIt.registerFactoryParam<AttendanceProvider, AuthProvider?, void>(
     (authProvider, _) => AttendanceProvider(

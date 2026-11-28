@@ -659,40 +659,69 @@ class _LeaveScreenState extends State<LeaveScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: provider.isSubmitting
-                      ? null
-                      : () => _handleProcessApproval(provider, req, 'reject'),
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  label: const Text('Tolak'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.errorRed,
-                    side: const BorderSide(color: AppColors.errorRed),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          Builder(
+            builder: (context) {
+              final currentUser = provider.authProvider?.currentUser;
+              final isSelfRequest = req.requesterId != null &&
+                  currentUser != null &&
+                  req.requesterId == currentUser.id;
+              final isBlockedSelfApproval = isSelfRequest && !(currentUser.isSuperadmin);
+
+              if (isBlockedSelfApproval) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.safetyAmberLight,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: provider.isSubmitting
-                      ? null
-                      : () => _handleProcessApproval(provider, req, 'approve'),
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: const Text('Setujui'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.emeraldGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    'Pengajuan pribadi tidak dapat disetujui sendiri.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.safetyAmber,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: provider.isSubmitting
+                          ? null
+                          : () => _handleProcessApproval(provider, req, 'reject'),
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text('Tolak'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.errorRed,
+                        side: const BorderSide(color: AppColors.errorRed),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: provider.isSubmitting
+                          ? null
+                          : () => _handleProcessApproval(provider, req, 'approve'),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: const Text('Setujui'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.emeraldGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -863,6 +892,24 @@ class _SubmitLeaveBottomSheetState extends State<_SubmitLeaveBottomSheet> {
                 if (val != null) setState(() => _selectedType = val);
               },
             ),
+            if (_selectedType.approvalSteps.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.lightBlueBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Alur Persetujuan: ${_selectedType.approvalSteps.map((s) => '${s.stepLevel}. ${s.approverTypeLabel}').join(' → ')}',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.steelBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
 
             // Date Range Picker

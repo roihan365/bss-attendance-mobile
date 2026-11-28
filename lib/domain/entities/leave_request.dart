@@ -30,7 +30,9 @@ class LeaveRequest {
   final String? attachmentUrl;
   final String? attachmentName;
   final List<LeaveApprovalStep> approvals;
+  final String? requesterId;
   final String? requesterName;
+  final String? requesterEmail;
   final String? requesterPosition;
   final String? requesterDivision;
   final DateTime? createdAt;
@@ -49,7 +51,9 @@ class LeaveRequest {
     this.attachmentUrl,
     this.attachmentName,
     this.approvals = const [],
+    this.requesterId,
     this.requesterName,
+    this.requesterEmail,
     this.requesterPosition,
     this.requesterDivision,
     this.createdAt,

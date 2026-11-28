@@ -25,8 +25,12 @@ class TodayStatusModel extends TodayStatus {
           : null;
       leaveSummary = TodayLeaveSummary(
         id: int.tryParse(leaveMap['id']?.toString() ?? ''),
-        leaveTypeName: leaveTypeMap?['name']?.toString() ?? leaveMap['leave_type_name']?.toString(),
-        leaveTypeCode: leaveTypeMap?['code']?.toString() ?? leaveMap['leave_type_code']?.toString(),
+        leaveTypeName: leaveTypeMap?['name']?.toString() ??
+            leaveMap['leave_type_name']?.toString() ??
+            leaveMap['type']?.toString(),
+        leaveTypeCode: leaveTypeMap?['code']?.toString() ??
+            leaveMap['leave_type_code']?.toString() ??
+            leaveMap['code']?.toString(),
         startDate: leaveMap['start_date']?.toString(),
         endDate: leaveMap['end_date']?.toString(),
         reason: leaveMap['reason']?.toString(),

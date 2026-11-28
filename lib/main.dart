@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
+import 'core/navigation/app_navigator.dart';
 import 'core/security/anti_mock_location_service.dart';
 import 'core/theme/app_colors.dart';
 import 'presentation/providers/attendance_provider.dart';
@@ -62,6 +63,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BSS Attendance',
       debugShowCheckedModeBanner: false,
+      navigatorKey: AppNavigator.navigatorKey,
+      scaffoldMessengerKey: AppNavigator.scaffoldMessengerKey,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,

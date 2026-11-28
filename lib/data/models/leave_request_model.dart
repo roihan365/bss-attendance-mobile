@@ -46,7 +46,9 @@ class LeaveRequestModel extends LeaveRequest {
     super.attachmentUrl,
     super.attachmentName,
     super.approvals = const [],
+    super.requesterId,
     super.requesterName,
+    super.requesterEmail,
     super.requesterPosition,
     super.requesterDivision,
     super.createdAt,
@@ -61,9 +63,14 @@ class LeaveRequestModel extends LeaveRequest {
         ? Map<String, dynamic>.from(json['user'] as Map)
         : null;
 
-    final divisionMap = userMap != null && userMap['division'] is Map
-        ? Map<String, dynamic>.from(userMap['division'] as Map)
-        : null;
+    String? requesterDivision;
+    if (userMap != null && userMap['division'] != null) {
+      if (userMap['division'] is Map) {
+        requesterDivision = userMap['division']['name']?.toString();
+      } else {
+        requesterDivision = userMap['division'].toString();
+      }
+    }
 
     final approvals = <LeaveApprovalStepModel>[];
     if (json['approvals'] is List) {
@@ -88,9 +95,11 @@ class LeaveRequestModel extends LeaveRequest {
       attachmentUrl: json['attachment_url']?.toString(),
       attachmentName: json['attachment_name']?.toString(),
       approvals: approvals,
+      requesterId: userMap?['id']?.toString(),
       requesterName: userMap?['name']?.toString() ?? json['requester_name']?.toString(),
+      requesterEmail: userMap?['email']?.toString(),
       requesterPosition: userMap?['position_title']?.toString(),
-      requesterDivision: divisionMap?['name']?.toString(),
+      requesterDivision: requesterDivision,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
     );
   }

@@ -315,7 +315,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.currentUser;
     final userName = user?.name ?? 'Karyawan PT BSS';
     final userEmail = user?.email ?? 'karyawan@bss.co.id';
-    final userId = user?.id != null ? 'BSS-${user!.id.toString().padLeft(4, '0')}' : 'BSS-0001';
+    final userId = user?.employeeCode ??
+        (user?.id != null ? 'BSS-${user!.id.toString().padLeft(3, '0')}' : 'BSS-001');
     final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'B';
 
     final totalCheckIns = attendanceProvider.records.where((r) => r.type == 'checkin').length;
@@ -379,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            user?.positionTitle ?? 'Karyawan Operasional Lapangan',
+                            user?.effectivePositionTitle ?? 'Karyawan Operasional Lapangan',
                             style: AppTextStyles.badgeText.copyWith(color: AppColors.steelBlue, fontSize: 10),
                           ),
                         ),
@@ -450,9 +451,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildEmploymentRow('Divisi / Departemen', user?.division?.name ?? 'Operasional & Engineering Site'),
                   const Divider(height: 18, color: AppColors.borderSubtle),
                   _buildEmploymentRow(
-                    'Atasan Langsung',
-                    user?.supervisor?.name ?? '-',
+                    'Atasan 1',
+                    user?.supervisor != null
+                        ? '${user!.supervisor!.name}${user.supervisor!.positionTitle != null ? " (${user.supervisor!.positionTitle})" : ""}'
+                        : '-',
                   ),
+                  if (user?.supervisor2 != null) ...[
+                    const Divider(height: 18, color: AppColors.borderSubtle),
+                    _buildEmploymentRow(
+                      'Atasan 2',
+                      '${user!.supervisor2!.name}${user.supervisor2!.positionTitle != null ? " (${user.supervisor2!.positionTitle})" : ""}',
+                    ),
+                  ],
                   const Divider(height: 18, color: AppColors.borderSubtle),
                   _buildEmploymentRow(
                     'Mode & Lokasi Kerja',

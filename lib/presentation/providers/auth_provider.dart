@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/navigation/app_navigator.dart';
+import '../../core/theme/app_colors.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
@@ -10,9 +12,11 @@ class AuthProvider extends ChangeNotifier {
   final LogoutUseCase logoutUseCase;
   final GetCurrentUserUseCase getCurrentUserUseCase;
   final RefreshUserProfileUseCase? refreshUserProfileUseCase;
+  final Future<void> Function()? clearLocalSession;
 
   User? _currentUser;
   bool _isLoading = false;
+  bool _isHandlingSessionExpired = false;
 
   User? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null && _currentUser!.token != null && _currentUser!.token!.isNotEmpty;
@@ -24,6 +28,7 @@ class AuthProvider extends ChangeNotifier {
     required this.logoutUseCase,
     required this.getCurrentUserUseCase,
     this.refreshUserProfileUseCase,
+    this.clearLocalSession,
   }) {
     _loadUser();
   }
@@ -42,6 +47,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> login(String email, String password) async {
     _isLoading = true;
+    _isHandlingSessionExpired = false;
     notifyListeners();
     try {
       _currentUser = await loginUseCase(email, password);
@@ -60,6 +66,48 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Dipanggil otomatis saat server mengembalikan 401 Unauthorized (token expired / tidak valid).
+  Future<void> handleSessionExpired() async {
+    if (_isHandlingSessionExpired || !isLoggedIn) return;
+    _isHandlingSessionExpired = true;
+
+    try {
+      _currentUser = null;
+      if (clearLocalSession != null) {
+        await clearLocalSession!();
+      }
+      notifyListeners();
+
+      // Tampilkan notifikasi sesi berakhir
+      AppNavigator.scaffoldMessengerKey.currentState?.clearSnackBars();
+      AppNavigator.scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.lock_clock_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text('Sesi Anda telah berakhir. Silakan login kembali.'),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.errorRed,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+
+      // Arahkan langsung ke halaman login dan hapus seluruh stack navigasi
+      AppNavigator.navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
+      );
+    } finally {
+      _isHandlingSessionExpired = false;
     }
   }
 

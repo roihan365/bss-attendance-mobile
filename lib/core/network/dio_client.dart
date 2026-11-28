@@ -6,7 +6,7 @@ import 'api_exceptions.dart';
 class DioClient {
   late final Dio dio;
   final Future<String?> Function()? getToken;
-  final void Function()? onUnauthorized;
+  void Function()? onUnauthorized;
 
   DioClient({this.getToken, this.onUnauthorized}) {
     dio = Dio(
@@ -60,7 +60,7 @@ class DioClient {
             error.response?.data ?? error.error,
           );
 
-          if (statusCode == 401) {
+          if (statusCode == 401 && !error.requestOptions.path.contains('/auth/login')) {
             AppLogger.w('DIO', 'Sesi login telah berakhir atau token tidak valid (401 Unauthorized)');
             onUnauthorized?.call();
             return handler.reject(
